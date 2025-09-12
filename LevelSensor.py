@@ -1,10 +1,5 @@
-# Importation des modules
 from machine import Pin, time_pulse_us
 import utime
-
-# Définition des pins utilisés par le capteur ultrason
-trig_pin = Pin(15, Pin.OUT)
-echo_pin = Pin(13, Pin.IN)
 
 # Données et dimensions de la cuve
 """
@@ -31,64 +26,60 @@ CAPACITY_OFFSET = 40  # capacité en litres entre le haut de la cuve et le débu
 SENSOR_OFFSET = 20  # zone aveugle du capteur en cm
 TOTAL_CAPACITY = ((2 * TRAPEZE_CAPACITY) + RECTANGLE_CAPACITY) - CAPACITY_OFFSET
 
-""" ********** Fonctions de mesure *********** """
-# Mesure de distance via le capteur ultrason
-def measure_level():
-    # Envoyer une impulsion de 10 microsecondes pour déclencher la mesure
-    trig_pin.value(0)
-    utime.sleep_us(2)
-    trig_pin.value(1)
-    utime.sleep_us(10)
-    trig_pin.value(0)
+class UltrasonSensor:
+    def __init__(self, trig_pin, echo_pin):
+        self.trig = trig_pin
+        self.echo = echo_pin
 
-    # Mesurer la durée du retour de l'écho en microsecondes
-    duration = time_pulse_us(echo_pin, 1, 30000)  # 30000 us timeout
+        self.level = 0.0
 
-    # Calcul la distance en cm
-    distance = (duration * 0.0343) / 2
-    print('Distance entre le capteur et le mazout: {:.2f} cm'.format(distance))
+    def read(self, unit='cm'):
+        # Envoyer une impulsion de 10 microsecondes pour déclencher la mesure
+        self.trig.value(0)
+        utime.sleep_us(2)
+        self.trig.value(1)
+        utime.sleep_us(10)
+        self.trig.value(0)
 
-    # Correction de la distance en prenant en compte la zone aveugle du capteur
-    correctedDistance = distance - SENSOR_OFFSET
-    print('Distance entre le hau de la cuve et le mazout: {:.2f} cm'.format(correctedDistance))
+        # Mesurer la durée du retour de l'écho en microsecondes
+        duration = time_pulse_us(self.echo, 1, 30000)  # 30000 us timeout
 
-    # Calcul de la hauteur de mazout en cm
-    oilLevel = TANK_HEIGHT - correctedDistance
-    print('Hauteur de mazout: {:.2f} cm'.format(oilLevel))
+        # Calcul la distance en cm
+        distance = ((duration * 0.0343) / 2) - SENSOR_OFFSET
+        self.level = TANK_HEIGHT - distance
 
-    return oilLevel
+        if unit == 'cm':
+            return self.level
+        elif unit == 'li':
+            return self.convert_to_liters()
+        
+    def convert_to_liters(self):
+        volume = 0
+        if self.level <= TANK_LEVEL_1:
+            # Mazout uniquement dans la partie 1
+            surface = SMALL_SIDE + (LARGE_SIDE - SMALL_SIDE) / TANK_LEVEL_1 * self.level
+            volume = (1/2 * (SMALL_SIDE + surface) * self.level * TANK_LENGTH)/1000  # /1000 pour capacité en litres
+        elif (self.level > TANK_LEVEL_1) & (self.level <= TANK_LEVEL_2):
+            # Partie 1 remplie + Partie 2 partiellement remplie
+            self.level = self.level - TANK_LEVEL_1
+            volume = (self.level * LARGE_SIDE * TANK_LENGTH)/1000  # /1000 pour capacité en litres
+            volume = volume + TRAPEZE_CAPACITY
+        elif (self.level > TANK_LEVEL_2) & (self.level <= TANK_HEIGHT):
+            # Partie 1 et 2 remplies + Partie 3 partiellement ou totalement remplie
+            self.level = self.level - TANK_LEVEL_2
+            surface = LARGE_SIDE + (SMALL_SIDE - LARGE_SIDE) / TANK_LEVEL_1 * self.level
+            volume = (1/2 * (LARGE_SIDE + surface) * self.level * TANK_LENGTH)/1000   # /1000 pour capacité en litres
+            volume = volume + TRAPEZE_CAPACITY + RECTANGLE_CAPACITY
 
-# Conversion de la mesure en cm en litres restants
-def measure_conversion(oilLevel):
-    volume = 0
-    if oilLevel <= TANK_LEVEL_1:
-        # Mazout uniquement dans la partie 1
-        oilSurface = SMALL_SIDE + (LARGE_SIDE - SMALL_SIDE) / TANK_LEVEL_1 * oilLevel
-        volume = (1/2 * (SMALL_SIDE + oilSurface) * oilLevel * TANK_LENGTH)/1000  # /1000 pour capacité en litres
-    elif (oilLevel > TANK_LEVEL_1) & (oilLevel <= TANK_LEVEL_2):
-        # Partie 1 remplie + Partie 2 partiellement remplie
-        level = oilLevel - TANK_LEVEL_1
-        volume = (level * LARGE_SIDE * TANK_LENGTH)/1000  # /1000 pour capacité en litres
-        volume = volume + TRAPEZE_CAPACITY
-    elif (oilLevel > TANK_LEVEL_2) & (oilLevel <= TANK_HEIGHT):
-        # Partie 1 et 2 remplies + Partie 3 partiellement ou totalement remplie
-        level = oilLevel - TANK_LEVEL_2
-        oilSurface = LARGE_SIDE + (SMALL_SIDE - LARGE_SIDE) / TANK_LEVEL_1 * level
-        volume = (1/2 * (LARGE_SIDE + oilSurface) * level * TANK_LENGTH)/1000   # /1000 pour capacité en litres
-        volume = volume + TRAPEZE_CAPACITY + RECTANGLE_CAPACITY
+        return volume
 
-    return volume
+if __name__ == "__main__":
+    LevelSensor = UltrasonSensor(15, 13)
 
-
-""" ********** Fonctions gestion des données *********** """
-# Affichage et enregistrement des données
-def log_oil_level(oil_volume):
-    print('Volume de mazout restant: {:.2f} litres'.format(oil_volume))
-    print('Pourcentage de mazout restant: {:.0f} %'.format((oil_volume/TOTAL_CAPACITY)*100))
-    # Ajouter du code pour sauvegarder la mesure
-
-
-
-while True:
-    measure_level()
-    utime.sleep(1)
+    # Effectuer la mesure et enregistrer le niveau de mazout
+    while 1:
+        level = LevelSensor.read('cm')
+        print('Hauteur de mazout: {:.2f} cm'.format(level))
+        level = LevelSensor.convert_to_liters()
+        print('Volume de mazout: {:.2f} litres'.format(level))
+        utime.sleep(1)
