@@ -1,5 +1,5 @@
 from machine import Pin, time_pulse_us
-import utime
+from utime import sleep, sleep_us
 
 # Données et dimensions de la cuve
 """
@@ -26,19 +26,19 @@ CAPACITY_OFFSET = 40  # capacité en litres entre le haut de la cuve et le débu
 SENSOR_OFFSET = 20  # zone aveugle du capteur en cm
 TOTAL_CAPACITY = ((2 * TRAPEZE_CAPACITY) + RECTANGLE_CAPACITY) - CAPACITY_OFFSET
 
-class UltrasonSensor:
+class Sensor_Utlrason:
     def __init__(self, trig_pin, echo_pin):
-        self.trig = trig_pin
-        self.echo = echo_pin
+        self.trig = Pin(trig_pin, Pin.OUT)
+        self.echo = Pin(echo_pin, Pin.IN)
 
         self.level = 0.0
 
     def read(self, unit='cm'):
         # Envoyer une impulsion de 10 microsecondes pour déclencher la mesure
         self.trig.value(0)
-        utime.sleep_us(2)
+        sleep_us(2)
         self.trig.value(1)
-        utime.sleep_us(10)
+        sleep_us(10)
         self.trig.value(0)
 
         # Mesurer la durée du retour de l'écho en microsecondes
@@ -74,12 +74,12 @@ class UltrasonSensor:
         return volume
 
 if __name__ == "__main__":
-    LevelSensor = UltrasonSensor(15, 13)
+    LevelSensor = Sensor_Utlrason(15, 13)
 
     # Effectuer la mesure et enregistrer le niveau de mazout
-    while 1:
+    while True:
         level = LevelSensor.read('cm')
         print('Hauteur de mazout: {:.2f} cm'.format(level))
         level = LevelSensor.convert_to_liters()
         print('Volume de mazout: {:.2f} litres'.format(level))
-        utime.sleep(1)
+        sleep(5)
