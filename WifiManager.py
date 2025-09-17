@@ -3,8 +3,6 @@ import urequests
 from utime import sleep
 from machine import Pin
 
-from logging import *
-
 # WifiManager class to handle WiFi connections and connectivity checks.
 # INPUTS:
 #   ssid: WiFi SSID
@@ -112,6 +110,8 @@ class WifiManager:
 
 # --------------------------------------------------------------------------------------------------------------------------------------- __name__ == "__main__":
 if __name__ == "__main__":
+    from logging import *
+    
     config = hotspot
     wifi = WifiManager(config["ssid"], config["pswd"], led_pin="PICOW")
     
