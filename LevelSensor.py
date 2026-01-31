@@ -56,6 +56,8 @@ class Sensor_Utlrason:
         # Calculate the distance in cm
         distance = ((duration * 0.0343) / 2) - SENSOR_OFFSET
         self.level = TANK_HEIGHT - distance
+        if self.level <= 0.0:
+            self.level = 0.0
 
         if unit == 'cm':
             return self.level
