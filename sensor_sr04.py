@@ -8,10 +8,10 @@ SENSOR_OFFSET = 20  # sensor blind zone in cm
 #   trig_pin: GPIO pin connected to the TRIG pin of the sensor
 #   echo_pin: GPIO pin connected to the ECHO pin of the sensor
 class SensorSR04:
-    def __init__(self, trig_pin, echo_pin):
+    def __init__(self, trig_pin, echo_pin, sensor_offset):
         self.trig = Pin(trig_pin, Pin.OUT)
         self.echo = Pin(echo_pin, Pin.IN)
-
+        self.sensor_offset = sensor_offset
         self.distance = 0.0
 
     # function to read the distance from the sensor and calculate the fuel oil level
@@ -31,19 +31,25 @@ class SensorSR04:
         duration = time_pulse_us(self.echo, 1, 30000)  # 30000 us timeout
 
         # Calculate the distance in cm
-        self.distance = ((duration * 0.0343) / 2) - SENSOR_OFFSET
+        self.distance = ((duration * 0.0343) / 2) - self.sensor_offset
 
         return self.distance
 
 if __name__ == "__main__":
-    from volume_calculator import convert_to_liters
+    from volume_calculator import HexagonalPrismTank
 
-    LevelSensor = SensorSR04(15, 13)
+    offset = 20.0 # sensor blind zone in cm
+
+    LevelSensor = SensorSR04(15, 13, offset)
+    tank = HexagonalPrismTank(250, 45.5, 59.5, 53, 74)
 
     # Perform the measurement and record the fuel oil level
     while True:
-        level = SensorSR04.read()
-        print('Fuel oil height: {:.2f} cm'.format(level))
-        liters = convert_to_liters(level)
+        distance = LevelSensor.read()
+
+        print('distance from sensor: {:.2f} cm'.format(distance))
+        liquid_height = tank.tank_height - distance
+        print('Fuel oil height: {:.2f} cm'.format(liquid_height))
+        liters = tank.to_liters(distance)
         print('Fuel oil capacity: {:.2f} L'.format(liters))
         sleep(5)

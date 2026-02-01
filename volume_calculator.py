@@ -1,49 +1,74 @@
-# Tank data and dimensions
-"""
-Tank divided into 3 parts (side view):
-- Lower part:      trapezoidal shape on the small side
-                   (from 0 to 45.5cm = 45.5cm)
-- Central part:    rectangular shape
-                   (from 45.5 to 105cm = 59.5cm)
-- Upper part:      trapezoidal shape on the large side
-                   (from 105 to 150.5cm = 45.5cm)
-"""
-TANK_LEVEL_1 = 45.5  # end height of the first stage
-TANK_LEVEL_2 = 105  # end height of the second stage
-TANK_HEIGHT = 150.5  # actual height of the tank in cm (full)
-TANK_LENGTH = 250  # actual length of the tank in cm
-GRADUATIONS_HEIGHT = 147.5  # max filling height of the tank in cm (capacity = 2500L)
+from abc import ABC, abstractmethod
 
-# Data for calculating the remaining volume
-SMALL_SIDE = 53  # small side of the trapezoidal parts
-LARGE_SIDE = 74  # large side of the trapezoid and width of the rectangle (i.e. separation between the two)
-TRAPEZE_CAPACITY = 720  # capacity in liters of the trapezoidal parts
-RECTANGLE_CAPACITY = 1100  # capacity in liters of the rectangular part
-CAPACITY_OFFSET = 40  # capacity in liters between the top of the tank and the start of the graduations
+class VolumeCalculator(ABC):
+    @abstractmethod
+    def to_liters(self, distance):
+        pass
 
-TOTAL_CAPACITY = ((2 * TRAPEZE_CAPACITY) + RECTANGLE_CAPACITY) - CAPACITY_OFFSET
 
-# function to convert the fuel oil level in cm to volume in liters
-# OUTPUT:
-#   volume: The fuel oil volume in liters
-def convert_to_liters(distance):
-    level = TANK_HEIGHT - distance
+class HexagonalPrismTank(VolumeCalculator):
+    # Tank dimensions
+    """
+    Tank divided into 3 parts (side view):
+    - Lower part:   trapezoidal shape on the small side
+                    (ex: from 0 to 45.5cm = 45.5cm)
+    - Central part: rectangular shape
+                    (ex: from 45.5 to 105cm = 59.5cm)
+    - Upper part:   trapezoidal shape on the large side
+                    (ex: from 105 to 150.5cm = 45.5cm)
+    """
+    def __init__(self, tank_length, h_rectangle, h_trapeze, min_width, max_width):
 
-    volume = 0
-    if level <= TANK_LEVEL_1:
-        # Fuel only in part 1
-        surface = SMALL_SIDE + (LARGE_SIDE - SMALL_SIDE) / TANK_LEVEL_1 * level
-        volume = (1/2 * (SMALL_SIDE + surface) * level * TANK_LENGTH)/1000  # /1000 for capacity in liters
-    elif (level > TANK_LEVEL_1) & (level <= TANK_LEVEL_2):
-        # Part 1 filled + Part 2 partially filled
-        level = level - TANK_LEVEL_1
-        volume = (level * LARGE_SIDE * TANK_LENGTH)/1000  # /1000 for capacity in liters
-        volume = volume + TRAPEZE_CAPACITY
-    elif (level > TANK_LEVEL_2) & (level <= TANK_HEIGHT):
-        # Parts 1 and 2 filled + Part 3 partially or fully filled
-        level = level - TANK_LEVEL_2
-        surface = LARGE_SIDE + (SMALL_SIDE - LARGE_SIDE) / TANK_LEVEL_1 * level
-        volume = (1/2 * (LARGE_SIDE + surface) * level * TANK_LENGTH)/1000   # /1000 for capacity in liters
-        volume = volume + TRAPEZE_CAPACITY + RECTANGLE_CAPACITY
+        self.tank_length = tank_length
+        self.h_rectangle = h_rectangle
+        self.h_trapeze = h_trapeze
+        self.min_width = min_width
+        self.max_width = max_width
 
-    return volume
+        # Calculate levels and tank height
+        self.level_1 = h_trapeze
+        self.level_2 = h_trapeze + h_rectangle
+        self.tank_height = self.level_2 + self.h_trapeze
+
+        # Pre-calculate part capacities
+        self.trapeze_capacity = self._calc_trapeze_volume(self.min_width, self.max_width, self.h_trapeze)
+        self.rectangle_capacity = self._calc_rectangle_volume(self.max_width, self.h_rectangle)
+
+    def _calc_trapeze_volume(self, side_a, side_b, height):
+        area = (side_a + side_b) / 2 * height
+        return (area * self.tank_length) / 1000  # /1000 for capacity in liters
+    
+    def _calc_rectangle_volume(self, side, height):
+        return (side * height * self.tank_length) / 1000  # /1000 for capacity in liter
+
+    # function to convert the fuel oil level in cm to volume in liters
+    # INPUT:
+    #   distance: The distance from the sensor to the fuel oil surface in cm
+    # OUTPUT:
+    #   volume: The fuel oil volume in liters
+    def to_liters(self, distance):
+        current_level = self.tank_height - distance
+        volume = 0
+
+        if current_level <= self.level_1:
+            # Fuel only in part 1
+            surface = self.min_width + (self.max_width - self.min_width) / self.h_trapeze * current_level
+            volume = (1/2 * (self.min_width + surface) * current_level * self.tank_length) / 1000  # /1000 for capacity in liters
+        elif (current_level > self.level_1) & (current_level <= self.level_2):
+            # Part 1 filled + Part 2 partially filled
+            relative_level = current_level - self.level_1
+            volume = self.trapeze_capacity + self._calc_rectangle_volume(self.max_width, relative_level)
+            # volume = (current_level * self.max_width * self.tank_length)/1000  # /1000 for capacity in liters
+            # volume = volume + self.trapeze_capacity
+        elif (current_level > self.level_2) & (current_level <= self.tank_height):
+            # Parts 1 and 2 filled + Part 3 partially or fully filled
+            relative_level = current_level - self.level_2
+
+            surface = self.max_width + (self.min_width - self.max_width) / self.h_trapeze * relative_level
+            volume = (1/2 * (self.max_width + surface) * relative_level * self.tank_length) / 1000   # /1000 for capacity in liters
+            volume = volume + self.trapeze_capacity + self.rectangle_capacity
+
+        if volume < 0:
+            volume = 0
+
+        return volume
