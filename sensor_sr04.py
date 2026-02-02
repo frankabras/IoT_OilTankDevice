@@ -4,16 +4,30 @@ from utime import sleep, sleep_ms, sleep_us
 class SensorSR04:
     """
     Class to handle HC-SR04 ultrasonic distance sensor.
-    INPUTS:
-        trig_pin: GPIO pin connected to the TRIG pin of the sensor
-        echo_pin: GPIO pin connected to the ECHO pin of the sensor
-        sensor_offset: Offset in cm to account for the sensor's blind zone
+    
+    Args:
+        trig_pin (int): GPIO pin connected to the TRIG pin of the sensor.
+        echo_pin (int): GPIO pin connected to the ECHO pin of the sensor.
+        sensor_offset (float): Offset in centimeters to account for sensor blind zone.
+        timeout_us (int, optional): Timeout for echo pulse measurement in microseconds. Default is 30000us.
+    
+    Attributes:
+        trig (Pin): Pin object for the TRIG pin.
+        echo (Pin): Pin object for the ECHO pin.
+        sensor_offset (float): Offset in centimeters to account for sensor blind zone.
+        timeout_us (int): Timeout for echo pulse measurement in microseconds.
+
+    Methods:
+        read_once(temperature_c: float = 20.0) -> float:
+            Perform a single distance measurement and return the distance in centimeters.
+        read(samples: int = 5, delay: int = 50, temperature_c: float = 20.0) -> float:
+            Perform multiple distance measurements and return the median distance in centimeters.
     """
-    def __init__(self, trig_pin: int, echo_pin: int, sensor_offset: float) -> None:
+    def __init__(self, trig_pin: int, echo_pin: int, sensor_offset: float, timeout_us: int = 30000) -> None:
         self.trig = Pin(trig_pin, Pin.OUT)
         self.echo = Pin(echo_pin, Pin.IN)
         self.sensor_offset = sensor_offset
-        self.timeout_us = 30000  # timeout for echo pulse in microseconds
+        self.timeout_us = timeout_us
 
         # cache for speed of sound based on temperature to avoid recalculating it every measurement
         self._cached_speed : float | None = None
@@ -118,7 +132,7 @@ class SensorSR04:
 
         distances.sort()
         if samples % 2:
-            # If odd number of samples, return the median
+            # If odd number of samples
             return distances[samples // 2]
         else:
             # If even number of samples
