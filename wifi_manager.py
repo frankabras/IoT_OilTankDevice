@@ -1,127 +1,166 @@
 import network
-import urequests
-from utime import sleep
-from machine import Pin
+import utime
+import gc
+import micropython
+from machine import Pin, Timer
+import socket
 
-# WifiManager class to handle WiFi connections and connectivity checks.
-# INPUTS:
-#   ssid: WiFi SSID
-#   password: WiFi password
-#   led_pin: Pin for LED indicator, set to "OFF" to disable
-#   **kwargs:
-#           - led_polarity: Indicates if the LED is active HIGH ("HI") or LOW ("LO"). Default is "HI".
 class WifiManager:
-    def __init__(self, ssid, password, led_pin="OFF", **kwargs):
-        self.ssid           = ssid                              # wifi credentials
-        self.password       = password
-        self.connected      = False                             # connection status
-        self.connectivity   = False                             # internet connectivity status
-        self.wlan           = network.WLAN(network.STA_IF)      # initialize WLAN in station mode
+    STATE_DISCONNECTED = 'disconnected'
+    STATE_CONNECTING   = 'connecting'
+    STATE_CONNECTED    = 'connected'
+    STATE_ERROR        = 'error'
+
+    def __init__(self, ssid, password, led_pin="OFF", led_polarity="HI", max_retries=5, retry_delay=2, connect_timeout=20):
+        self.ssid = ssid
+        self.password = password
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.connect_timeout = connect_timeout
+
+        self.enable_connection = False
+        self.is_connected = False
         
-        self.wlan.active(True)                                  # activate the WLAN interface
+        self.wlan = network.WLAN(network.STA_IF)
+        self.wlan.active(True)
 
-        if not led_pin == "OFF":                                # setup LED if not disabled  
-            if led_pin == "PICO":                               # setup led from board type 
-                self.led = Pin(25, Pin.OUT)
-                self.led_polarity = "HI"
-                self.led.value(True)
-            elif led_pin == "PICOW":
-                self.led = Pin("LED", Pin.OUT)
-                self.led_polarity = "HI"
-                self.led.value(True) 
-            else:                                               # or setup led from pin number
-                pin = int(led_pin) 
-                self.led = Pin(pin, Pin.OUT)
-                self.led_polarity = kwargs.get("led_polarity", "HI") # default polarity is "HI"
-                if self.led_polarity == "LO":
-                    self.led.value(False)
-                else:
-                    self.led.value(True)                         
-        else:
-            self.led = None 
+        self._led = None
+        if led_pin != "OFF":
+            self._led = Pin(led_pin, Pin.OUT)
+            self._led_polarity_mask = 0 if led_polarity.upper() == "HI" else 1
+            self._set_led(False)
 
-        # Autres fonctions à développer:
-        # - gestion des erreurs de connexion
-        # - gestion mqtt
-    
-    # function to disconnect device from WiFi
-    def disconnect(self):
-        self.wlan.disconnect()
-        self.connected = False
-        if self.led is not None: 
-            # LED on when disconnected             
-            if self.led_polarity == "LO": 
-                self.led.value(True) 
-            else:                            
-                self.led.value(False)
-        print("Disconnected from WiFi")
-
-    # function to connect device to WiFi
-    # INPUTS:
-    #   retry: number of connection attempts (default is 10)
-    # OUTPUTS:
-    #   self.connected: Boolean indicating whether the connection was successful.
-    def connect(self, retry=10): 
-        self.wlan.connect(self.ssid, self.password)     # attempt to connect to WiFi
-        for attempt in range(retry):                    # try to connect for 'retry' times
-            if self.wlan.isconnected():                 # check internet connectivity
-                self.connected = True
-                print("Connected to WiFi!")
-                print(self.wlan.ifconfig())
-                break                                   # exit loop if connected
-            self.connected = False
-            print(f"Connecting...{attempt+1}/{retry}")
-            sleep(1)
-        else:                                           # executed if the loop is not broken (connection failed)
-            print("Connection failure")
-
-        if self.led is not None:
-            # LED off if connected
-            if self.led_polarity == "LO":
-                self.led.value(self.connected)
-            else:
-                self.led.value(not self.connected)
+        # Using a hardware timer for the FSM
+        self._fsm_timer = Timer(0) 
+        self._state = self.STATE_DISCONNECTED
         
-        return self.connected
+        self._attempt_count = 0
+        self._last_action_ms = 0
+        self._blink_state = False
+        self._tick_count = 0
+        
+        # RReference for the scheduler
+        self._fsm_ref = self._fsm_logic
 
-    # function to check internet connectivity by sending a HEAD request to a specified URL
-    # HEAD: requests only retrieve headers, not the full content
-    # INPUTS:
-    #   url: The URL to check (default is "http://www.google.com")
-    #   timeout: The timeout for the request in seconds (default is 5)
-    # OUTPUTS:
-    #   self.connectivity: Boolean indicating whether the connection was successful.
-    def check_connectivity(self, url="http://www.google.com", timeout=5):
-        connectivity = False
-        try:                                                    # try to connect to the specified URL to check internet connectivity
-            response = urequests.head(url, timeout=timeout)
-            if response.status_code == 200:                     # check if the response status code is 200 (OK)
-                print(f"Successfully connected to {url} (Status: {response.status_code})")
-                self.connectivity = True
-            else:
-                print(f"Request to {url} failed (Status: {response.status_code})")
-                self.connectivity = False
-            response.close()    
+    def _set_led(self, state):
+        if self._led:
+            self._led.value(int(state) ^ self._led_polarity_mask)
+
+    def _fsm_logic(self, _):
+        """ Logic executed OUTSIDE interruption thanks to schedule """
+        try:
+            now = utime.ticks_ms()
+            self._tick_count += 1
+            
+            # --- STATE: DISCONNECTED ---
+            if self._state == self.STATE_DISCONNECTED:
+                self._set_led(False)
+                if self.enable_connection:
+                    print("[WiFi] Starting procedure...")
+                    self._attempt_count = 0
+                    self._state = self.STATE_CONNECTING
+                    self._last_action_ms = 0 # Force immediate connection
+
+            # --- STATE: CONNECTING ---
+            elif self._state == self.STATE_CONNECTING:
+                # 1. Blink management
+                self._set_led((self._tick_count // 5) % 2 == 0)
+
+                # 2. If not currently attempting, start an attempt
+                if not self.wlan.isconnected() and utime.ticks_diff(now, self._last_action_ms) > (self.retry_delay * 1000):
+                    if self._attempt_count < self.max_retries:
+                        self._attempt_count += 1
+                        print(f"[WiFi] Attempt {self._attempt_count}/{self.max_retries}")
+                        self.wlan.connect(self.ssid, self.password)
+                        self._last_action_ms = now 
+                    else:
+                        print("[WiFi] Total failure.")
+                        self._state = self.STATE_ERROR
+                        self._last_action_ms = now
+
+                # 3. Success check
+                if self.wlan.isconnected():
+                    # Check if we have an IP
+                    if self.wlan.ifconfig()[0] != '0.0.0.0':
+                        print(f"[WiFi] Connected! IP: {self.wlan.ifconfig()[0]}")
+                        self.is_connected = True
+                        self._state = self.STATE_CONNECTED
+                        self._set_led(True)
+
+            # --- STATE: CONNECTED (Monitoring) ---
+            elif self._state == self.STATE_CONNECTED:
+                self._set_led(True)
+                if not self.wlan.isconnected():
+                    print("[WiFi] Link lost!")
+                    self.is_connected = False
+                    self._state = self.STATE_DISCONNECTED
+
+            # --- STATE: ERROR (Pause before reset) ---
+            elif self._state == self.STATE_ERROR:
+                # Fast blink
+                self._set_led(self._tick_count % 2 == 0)
+                if utime.ticks_diff(now, self._last_action_ms) > 20000: # 20s rest
+                    self._state = self.STATE_DISCONNECTED
+
         except Exception as e:
-            print(f"Error during request to {url}: {e}")
-            self.connectivity = False
-        
-        return self.connectivity
+            # If an error occurs, we do NOT kill the timer, we just print
+            print(f"[WiFi Critical Error] {e}")
 
-# ---------------------------------------------------------------------------------------------------------------------------------------
+    def _timer_callback(self, t):
+        # We do NOTHING here, we delegate everything to the scheduler
+        micropython.schedule(self._fsm_ref, 0)
+
+    def start(self):
+        print("[WiFi] Manager started")
+        # We trigger the measurement every 200ms to give time to the SDK
+        self._fsm_timer.init(period=200, mode=Timer.PERIODIC, callback=self._timer_callback)
+
+    def stop(self):
+        self._fsm_timer.deinit()
+        self.wlan.disconnect()
+        self._set_led(False)
+        self._state = self.STATE_DISCONNECTED
+    
+    def check_internet(self, host="8.8.8.8", port=53, timeout=3):
+        if not self.is_connected:
+            return False
+        try:
+            # We do not even go through DNS (we use the direct IP)
+            # to avoid blocking if the router's DNS server fails.
+            addr = (host, port)
+            s = socket.socket()
+            s.settimeout(timeout)
+            s.connect(addr) # Brutal connection attempt
+            s.close()
+            self.has_connectivity = True
+            return True
+        except:
+            self.has_connectivity = False
+            return False
+
+# --------------------------------------------------------------------------------------------------------
+
 if __name__ == "__main__":
     from logging import *
+    from utime import sleep, ticks_ms, ticks_diff
     
     config = hotspot
-    wifi = WifiManager(config["ssid"], config["pswd"], led_pin="PICOW")
+    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=2, led_polarity="LO")
     
-    while True:
-        try:
-            wifi.connect()
-            if wifi.connected:
-                wifi.check_connectivity()
-            sleep(5)
-        except KeyboardInterrupt:
-            print("Program interrupted")
-            wifi.disconnect()                           # wifi disconnection
-            break
+    wifi.start()
+    wifi.enable_connection = True
+
+    last_tick = ticks_ms()
+    try:
+        while True:
+            if ticks_diff(ticks_ms(), last_tick) >= 1000:
+                last_tick = ticks_ms()
+                print("Main")
+                if wifi.is_connected:
+                    if wifi.check_internet():
+                        print(" - Internet reachable")
+                    else:
+                        print(" - No internet connectivity")
+    except KeyboardInterrupt:
+        print("Stopping WiFi Manager by user")
+        wifi.stop()
