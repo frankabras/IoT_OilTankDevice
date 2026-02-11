@@ -110,8 +110,11 @@ class WifiManager:
             
             # --- STATE: DISCONNECTED ---
             if self._state == self.STATE_DISCONNECTED:
-                self._set_led(False)
+                gc.collect() # Clean up before connection attempt
+                self.wlan.disconnect()
+                self._set_led(True)
                 if self.enable_connection:
+                    print("[WiFi] Connection enabled.")
                     print("[WiFi] Starting procedure...")
                     self._attempt_count = 0
                     self._state = self.STATE_CONNECTING
@@ -135,6 +138,10 @@ class WifiManager:
                         except Exception as e:
                             print(f"[WiFi Error] Driver currently busy: {e}")
                             pass
+                    elif not self.enable_connection:
+                        self._state = self.STATE_DISCONNECTED
+                        self._last_action_ms = now
+                        print("[WiFi] Connection disabled.")
                     else:
                         print("[WiFi] Total failure.")
                         self._state = self.STATE_ERROR
@@ -151,12 +158,15 @@ class WifiManager:
 
             # --- STATE: CONNECTED (Monitoring) ---
             elif self._state == self.STATE_CONNECTED:
-                self._set_led(True)
+                self._set_led(False)
                 if not self.wlan.isconnected():
                     print("[WiFi] Link lost!")
                     self.is_connected = False
                     self._state = self.STATE_DISCONNECTED
                     gc.collect() # Clean up after disconnection
+                elif not self.enable_connection:
+                    self._state = self.STATE_DISCONNECTED
+                    print("[WiFi] Connection disabled.")
 
             # --- STATE: ERROR (Pause before reset) ---
             elif self._state == self.STATE_ERROR:
@@ -164,6 +174,9 @@ class WifiManager:
                 self._set_led(self._tick_count % 2 == 0)
                 if utime.ticks_diff(now, self._last_action_ms) > 20000: # 20s rest
                     self._state = self.STATE_DISCONNECTED
+                elif not self.enable_connection:
+                    self._state = self.STATE_DISCONNECTED
+                    print("[WiFi] Connection disabled.")
 
         except Exception as e:
             # If an error occurs, we do NOT kill the timer, we just print
@@ -200,6 +213,7 @@ class WifiManager:
         :rtype: None
         """
         gc.collect() # Clean up before stopping
+
         self._fsm_timer.deinit()
         self.wlan.disconnect()
         self._set_led(False)
@@ -250,6 +264,7 @@ if __name__ == "__main__":
     
     wifi.start()
     wifi.enable_connection = True
+    cpt = 0
 
     last_tick = ticks_ms()
     try:
