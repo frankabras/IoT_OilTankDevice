@@ -8,13 +8,31 @@ class VolumeCalculator(ABC):
 
 class HexagonalPrismTank(VolumeCalculator):
     """
-    Tank divided into 3 parts (side view):
-    - Lower part:   trapezoidal shape on the small side
-                    (ex: from 0 to 45.5cm = 45.5cm)
-    - Central part: rectangular shape
-                    (ex: from 45.5 to 105cm = 59.5cm)
-    - Upper part:   trapezoidal shape on the large side
-                    (ex: from 105 to 150.5cm = 45.5cm)
+    Class to calculate the volume of fuel oil in a hexagonal prism tank 
+    based on the distance from the sensor to the fuel oil surface.
+
+    Args:
+        tank_length (float): Length of the tank in cm
+        h_rectangle (float): Height of the rectangular part of the tank in cm
+        h_trapeze (float): Height of the trapezoidal part of the tank in cm
+        min_width (float): Minimum width of the trapezoidal part in cm
+        max_width (float): Maximum width of the trapezoidal part in cm
+
+    Attributes:
+        tank_length (float): Length of the tank in cm
+        h_rectangle (float): Height of the rectangular part of the tank in cm
+        h_trapeze (float): Height of the trapezoidal part of the tank in cm
+        min_width (float): Minimum width of the trapezoidal part in cm
+        max_width (float): Maximum width of the trapezoidal part in cm
+        level_1 (float): Level at which the trapezoidal part is filled in cm
+        level_2 (float): Level at which the rectangular part is filled in cm
+        tank_height (float): Total height of the tank in cm
+    
+    Methods:
+        to_liters(distance: float) -> float:
+            Convert the fuel oil level in cm to volume in liters.
+            :param distance: The distance from the sensor to the fuel oil surface in cm
+            :return: The fuel oil volume in liters
     """
     def __init__(self,
                  tank_length: float,
@@ -42,6 +60,18 @@ class HexagonalPrismTank(VolumeCalculator):
                              side_a: float,
                              side_b: float,
                              height: float) -> float:
+        """
+        Calculate the volume of a trapezoidal section of the tank.
+        
+        :param side_a: The length of one parallel side of the trapezoid in cm
+        :type side_a: float
+        :param side_b: The length of the other parallel side of the trapezoid in cm
+        :type side_b: float
+        :param height: The height of the trapezoidal section in cm
+        :type height: float
+        :return: The volume of the trapezoidal section in liters
+        :rtype: float
+        """
         area = (side_a + side_b) / 2 * height
         return (area * self.tank_length) / 1000  # /1000 for capacity in liters
     
@@ -51,14 +81,25 @@ class HexagonalPrismTank(VolumeCalculator):
         """
         Calculate the volume of a rectangular section of the tank.
 
-    # function to convert the fuel oil level in cm to volume in liters
-    # INPUT:
-    #   distance: The distance from the sensor to the fuel oil surface in cm
-    # OUTPUT:
-    #   volume: The fuel oil volume in liters
-    def to_liters(self, distance):
+        :param side: The length of the side of the rectangle in cm
+        :type side: float
+        :param height: The height of the rectangular section in cm
+        :type height: float
+        :return: The volume of the rectangular section in liters
+        :rtype: float
+        """
+        return (side * height * self.tank_length) / 1000  # /1000 for capacity in liters
+
     def to_liters(self,
                   distance: float) -> float:
+        """
+        Convert the fuel oil level in cm to volume in liters.
+        
+        :param distance: The distance from the sensor to the fuel oil surface in cm
+        :type distance: float
+        :return: The volume of fuel oil in liters
+        :rtype: float
+        """
         current_level = self.tank_height - distance
         volume = 0
 

@@ -13,6 +13,7 @@ class Sensor_DHT22:
             If True, the pin is configured with an internal pull-up resistor.
 
     Attributes:
+        sensor (dht.DHT22): The DHT22 sensor object.
         temperature (float | None): Last measured temperature in °C.
         humidity (float | None): Last measured humidity in %.
 
@@ -41,7 +42,6 @@ class Sensor_DHT22:
         """
         Read temperature and humidity from the DHT22 sensor.
         
-        :param self: Instance of the Sensor_DHT22 class
         :return: Tuple containing temperature in °C and humidity in %
         :rtype: tuple[float, float] | tuple[None, None] if first measure fails
         """

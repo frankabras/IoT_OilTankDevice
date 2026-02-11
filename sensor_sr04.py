@@ -40,7 +40,7 @@ class SensorSR04:
     def _trigger(self) -> None:
         """
         Send a trigger pulse to the ultrasonic sensor.
-        :param self: Instance of the SensorSR04 class
+
         :return: None
         :rtype: None
         """
@@ -55,7 +55,6 @@ class SensorSR04:
         """
         Measure the duration of the echo pulse.
 
-        :param self: Instance of the SensorSR04 class
         :return: Duration of the echo pulse in microseconds with negative value indicating timeout or error
         :rtype: int 
         """
@@ -66,8 +65,8 @@ class SensorSR04:
         """
         Calculate the speed of sound in air based on temperature.
 
-        :param self: Instance of the SensorSR04 class
         :param temperature_c: Temperature in degrees Celsius
+        :type temperature_c: float
         :return: Speed of sound in cm/us
         :rtype: float
         """
@@ -86,9 +85,10 @@ class SensorSR04:
         """
         Convert the raw echo duration to distance in centimeters.
 
-        :param self: Instance of the SensorSR04 class
         :param duration_us: Duration of the echo pulse in microseconds
+        :type duration_us: int
         :param sound_speed: Speed of sound in cm/us
+        :type sound_speed: float
         :return: Distance from the sensor to the object in centimeters
         :rtype: float
         """
@@ -102,8 +102,8 @@ class SensorSR04:
         """
         Read the distance from the sensor once and convert it to centimeters.
         
-        :param self: Instance of the SensorSR04 class
         :param temperature_c: Temperature in degrees Celsius
+        :type temperature_c: float
         :return: Distance from the sensor to the object in centimeters
         :rtype: float
         """
@@ -119,10 +119,12 @@ class SensorSR04:
         """
         Read the distance from the sensor multiple times and return the median value.
         
-        :param self: Instance of the SensorSR04 class
         :param samples: Number of samples to take
+        :type samples: int
         :param delay: Delay between samples in milliseconds
+        :type delay: int
         :param temperature_c: Temperature in degrees Celsius
+        :type temperature_c: float
         :return: Median distance from the sensor to the object in centimeters
         :rtype: float
         """
