@@ -271,12 +271,23 @@ if __name__ == "__main__":
         while True:
             if ticks_diff(ticks_ms(), last_tick) >= 1000:
                 last_tick = ticks_ms()
+                cpt += 1
                 print("Main")
                 if wifi.is_connected:
                     if wifi.check_internet():
                         print(" - Internet reachable")
                     else:
                         print(" - No internet connectivity")
+
+                if cpt == 10:
+                    cpt = 0
+                    if wifi.enable_connection:
+                        if input("Disable connection ? (y/n) : ").lower() == 'y':
+                            wifi.enable_connection = False
+                    else:
+                        if input("Enable connection ? (y/n) : ").lower() == 'y':
+                            wifi.enable_connection = True
+
     except KeyboardInterrupt:
         print("Stopping WiFi Manager by user")
         wifi.stop()
