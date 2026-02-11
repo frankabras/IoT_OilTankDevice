@@ -61,7 +61,7 @@ class Sensor_DHT22:
 if __name__ == "__main__":
     from utime import sleep
 
-    sensor = Sensor_DHT22(pin=14,
+    sensor = Sensor_DHT22(pin=2,
                           internal_pullup=False)
 
     while True:

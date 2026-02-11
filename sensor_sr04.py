@@ -144,12 +144,12 @@ if __name__ == "__main__":
 
     offset = 20.0 # sensor blind zone in cm
 
-    LevelSensor = SensorSR04(15, 13, offset)
+    LevelSensor = SensorSR04(3, 4, offset)
     tank = HexagonalPrismTank(250, 45.5, 59.5, 53, 74)
 
     # Perform the measurement and record the fuel oil level
     while True:
-        distance = LevelSensor.read(temperature_c=20.0)
+        distance = LevelSensor.read(temperature_c=22.8)
 
         print('distance from sensor: {:.2f} cm'.format(distance))
         liquid_height = tank.tank_height - distance
