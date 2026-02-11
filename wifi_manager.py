@@ -23,6 +23,7 @@ class WifiManager:
         
         self.wlan = network.WLAN(network.STA_IF)
         self.wlan.active(True)
+        gc.collect() # Clean up after WLAN activation
 
         self._led = None
         if led_pin != "OFF":
@@ -69,10 +70,16 @@ class WifiManager:
                 # 2. If not currently attempting, start an attempt
                 if not self.wlan.isconnected() and utime.ticks_diff(now, self._last_action_ms) > (self.retry_delay * 1000):
                     if self._attempt_count < self.max_retries:
-                        self._attempt_count += 1
-                        print(f"[WiFi] Attempt {self._attempt_count}/{self.max_retries}")
-                        self.wlan.connect(self.ssid, self.password)
-                        self._last_action_ms = now 
+                        gc.collect() # Clean up before connection attempt
+                        self.wlan.disconnect() # Ensure we start clean
+                        try :
+                            self.wlan.connect(self.ssid, self.password)
+                            self._attempt_count += 1
+                            print(f"[WiFi] Attempt {self._attempt_count}/{self.max_retries}")
+                            self._last_action_ms = now
+                        except Exception as e:
+                            print(f"[WiFi Error] Driver currently busy: {e}")
+                            pass
                     else:
                         print("[WiFi] Total failure.")
                         self._state = self.STATE_ERROR
@@ -94,6 +101,7 @@ class WifiManager:
                     print("[WiFi] Link lost!")
                     self.is_connected = False
                     self._state = self.STATE_DISCONNECTED
+                    gc.collect() # Clean up after disconnection
 
             # --- STATE: ERROR (Pause before reset) ---
             elif self._state == self.STATE_ERROR:
@@ -127,6 +135,7 @@ class WifiManager:
         try:
             # We do not even go through DNS (we use the direct IP)
             # to avoid blocking if the router's DNS server fails.
+            gc.collect() # Clean up before socket operation
             addr = (host, port)
             s = socket.socket()
             s.settimeout(timeout)
@@ -135,6 +144,7 @@ class WifiManager:
             self.has_connectivity = True
             return True
         except:
+            gc.collect() # Clean up after failure
             self.has_connectivity = False
             return False
 
@@ -145,7 +155,7 @@ if __name__ == "__main__":
     from utime import sleep, ticks_ms, ticks_diff
     
     config = hotspot
-    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=2, led_polarity="LO")
+    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO")
     
     wifi.start()
     wifi.enable_connection = True
