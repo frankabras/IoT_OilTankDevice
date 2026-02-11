@@ -24,7 +24,9 @@ class Sensor_DHT22:
 
     MIN_INTERVAL = 2000 # Minimum interval between readings in milliseconds (required by DHT22)
 
-    def __init__(self, pin: int, internal_pullup: bool = False) -> None:
+    def __init__(self,
+                 pin: int,
+                 internal_pullup: bool = False) -> None:
         if internal_pullup:
             self.sensor = dht.DHT22(Pin(pin, Pin.IN, Pin.PULL_UP))
         else:

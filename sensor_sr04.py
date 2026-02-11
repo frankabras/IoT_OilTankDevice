@@ -23,7 +23,11 @@ class SensorSR04:
         read(samples: int = 5, delay: int = 50, temperature_c: float = 20.0) -> float:
             Perform multiple distance measurements and return the median distance in centimeters.
     """
-    def __init__(self, trig_pin: int, echo_pin: int, sensor_offset: float, timeout_us: int = 30000) -> None:
+    def __init__(self,
+                 trig_pin: int,
+                 echo_pin: int,
+                 sensor_offset: float,
+                 timeout_us: int = 30000) -> None:
         self.trig = Pin(trig_pin, Pin.OUT)
         self.echo = Pin(echo_pin, Pin.IN)
         self.sensor_offset = sensor_offset
@@ -57,7 +61,8 @@ class SensorSR04:
         """
         return time_pulse_us(self.echo, 1, self.timeout_us)
     
-    def _calc_sound_speed(self, temperature_c: float) -> float:
+    def _calc_sound_speed(self,
+                          temperature_c: float) -> float:
         """
         Calculate the speed of sound in air based on temperature.
 
@@ -75,7 +80,9 @@ class SensorSR04:
         self._cached_temp_c = temperature_c
         return speed_cm_us
     
-    def _raw_to_distance(self, duration_us: int, sound_speed: float) -> float:
+    def _raw_to_distance(self,
+                         duration_us: int,
+                         sound_speed: float) -> float:
         """
         Convert the raw echo duration to distance in centimeters.
 
@@ -90,7 +97,8 @@ class SensorSR04:
         
         return ((duration_us * sound_speed) / 2.0) - self.sensor_offset
 
-    def read_once(self, temperature_c: float = 20.0) -> float:
+    def read_once(self,
+                  temperature_c: float = 20.0) -> float:
         """
         Read the distance from the sensor once and convert it to centimeters.
         
@@ -104,7 +112,10 @@ class SensorSR04:
         speed_cm_us = self._calc_sound_speed(temperature_c)
         return self._raw_to_distance(duration, speed_cm_us)
     
-    def read(self, samples: int = 5, delay: int = 50, temperature_c: float = 20.0) -> float:
+    def read(self, 
+             samples: int = 5,
+             delay: int = 50,
+             temperature_c: float = 20.0) -> float:
         """
         Read the distance from the sensor multiple times and return the median value.
         

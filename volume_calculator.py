@@ -7,7 +7,6 @@ class VolumeCalculator(ABC):
 
 
 class HexagonalPrismTank(VolumeCalculator):
-    # Tank dimensions
     """
     Tank divided into 3 parts (side view):
     - Lower part:   trapezoidal shape on the small side
@@ -17,7 +16,12 @@ class HexagonalPrismTank(VolumeCalculator):
     - Upper part:   trapezoidal shape on the large side
                     (ex: from 105 to 150.5cm = 45.5cm)
     """
-    def __init__(self, tank_length, h_rectangle, h_trapeze, min_width, max_width):
+    def __init__(self,
+                 tank_length: float,
+                 h_rectangle: float,
+                 h_trapeze: float,
+                 min_width: float,
+                 max_width: float) -> None:
 
         self.tank_length = tank_length
         self.h_rectangle = h_rectangle
@@ -34,12 +38,18 @@ class HexagonalPrismTank(VolumeCalculator):
         self.trapeze_capacity = self._calc_trapeze_volume(self.min_width, self.max_width, self.h_trapeze)
         self.rectangle_capacity = self._calc_rectangle_volume(self.max_width, self.h_rectangle)
 
-    def _calc_trapeze_volume(self, side_a, side_b, height):
+    def _calc_trapeze_volume(self,
+                             side_a: float,
+                             side_b: float,
+                             height: float) -> float:
         area = (side_a + side_b) / 2 * height
         return (area * self.tank_length) / 1000  # /1000 for capacity in liters
     
-    def _calc_rectangle_volume(self, side, height):
-        return (side * height * self.tank_length) / 1000  # /1000 for capacity in liter
+    def _calc_rectangle_volume(self,
+                               side: float,
+                               height: float) -> float:
+        """
+        Calculate the volume of a rectangular section of the tank.
 
     # function to convert the fuel oil level in cm to volume in liters
     # INPUT:
@@ -47,6 +57,8 @@ class HexagonalPrismTank(VolumeCalculator):
     # OUTPUT:
     #   volume: The fuel oil volume in liters
     def to_liters(self, distance):
+    def to_liters(self,
+                  distance: float) -> float:
         current_level = self.tank_height - distance
         volume = 0
 
