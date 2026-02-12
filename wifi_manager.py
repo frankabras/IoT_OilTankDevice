@@ -27,6 +27,7 @@ class WifiManager:
         enable_connection (bool): Flag to enable or disable the connection process.
         is_connected (bool): Flag indicating whether the device is currently connected to WiFi.
         has_connectivity (bool): Flag indicating whether the device has internet connectivity.
+        connection_failed (bool): Flag indicating whether the connection process has failed after maximum retries.
     
     Methods:
         start() -> None:
@@ -47,11 +48,13 @@ class WifiManager:
                  led_polarity: str = "HI",
                  max_retries: int = 5,
                  retry_delay: int = 2,
-                 connect_timeout: int = 20) -> None:
+                 connect_timeout: int = 20,
+                 max_error_count: int = 3) -> None:
         # Control flags and status indicators
         self.enable_connection = False
         self.is_connected = False
         self.has_connectivity = False
+        self.connection_failed = False
 
         # Configuration parameters
         self._ssid = ssid
@@ -59,10 +62,12 @@ class WifiManager:
         self._max_retries = max_retries
         self._retry_delay = retry_delay
         self._connect_timeout = connect_timeout
+        self._max_error_count = max_error_count
 
         # Internal state variables for FSM and LED management
         self._attempt_count = 0
         self._last_action_ms = 0
+        self._error_count = 0
         self._blink_state = False
         self._tick_count = 0
 
@@ -117,6 +122,7 @@ class WifiManager:
                     print("[WiFi] Connection enabled.")
                     print("[WiFi] Starting procedure...")
                     self._attempt_count = 0
+                    self.connection_failed = False
                     self._state = self.STATE_CONNECTING
                     self._last_action_ms = 0 # Force immediate connection
 
@@ -139,11 +145,13 @@ class WifiManager:
                             print(f"[WiFi Error] Driver currently busy: {e}")
                             pass
                     elif not self.enable_connection:
+                        self._error_count = 0
                         self._state = self.STATE_DISCONNECTED
                         self._last_action_ms = now
                         print("[WiFi] Connection disabled.")
                     else:
                         print("[WiFi] Total failure.")
+                        self._error_count += 1
                         self._state = self.STATE_ERROR
                         self._last_action_ms = now
 
@@ -153,6 +161,7 @@ class WifiManager:
                     if self.wlan.ifconfig()[0] != '0.0.0.0':
                         print(f"[WiFi] Connected! IP: {self.wlan.ifconfig()[0]}")
                         self.is_connected = True
+                        self._error_count = 0
                         self._state = self.STATE_CONNECTED
                         self._set_led(True)
 
@@ -165,6 +174,7 @@ class WifiManager:
                     self._state = self.STATE_DISCONNECTED
                     gc.collect() # Clean up after disconnection
                 elif not self.enable_connection:
+                    self._error_count = 0
                     self._state = self.STATE_DISCONNECTED
                     print("[WiFi] Connection disabled.")
 
@@ -172,9 +182,16 @@ class WifiManager:
             elif self._state == self.STATE_ERROR:
                 # Fast blink
                 self._set_led(self._tick_count % 2 == 0)
-                if utime.ticks_diff(now, self._last_action_ms) > 20000: # 20s rest
+                if self._error_count >= self._max_error_count:
+                    print("[WiFi] Maximum error count reached. Stopping attempts.")
+                    self._error_count = 0
+                    self.enable_connection = False
+                    self.connection_failed = True
+                
+                if utime.ticks_diff(now, self._last_action_ms) > 10000: # 10s rest
                     self._state = self.STATE_DISCONNECTED
                 elif not self.enable_connection:
+                    self._error_count = 0
                     self._state = self.STATE_DISCONNECTED
                     print("[WiFi] Connection disabled.")
 
@@ -264,29 +281,22 @@ if __name__ == "__main__":
     
     wifi.start()
     wifi.enable_connection = True
-    cpt = 0
 
     last_tick = ticks_ms()
     try:
         while True:
             if ticks_diff(ticks_ms(), last_tick) >= 1000:
                 last_tick = ticks_ms()
-                cpt += 1
-                print("Main")
+                # print("Main")
                 if wifi.is_connected:
                     if wifi.check_internet():
                         print(" - Internet reachable")
                     else:
                         print(" - No internet connectivity")
-
-                if cpt == 10:
-                    cpt = 0
-                    if wifi.enable_connection:
-                        if input("Disable connection ? (y/n) : ").lower() == 'y':
-                            wifi.enable_connection = False
-                    else:
-                        if input("Enable connection ? (y/n) : ").lower() == 'y':
-                            wifi.enable_connection = True
+                elif wifi.connection_failed:
+                    if input("Retry connection ? (y/n) : ").lower() == 'y':
+                        wifi.enable_connection = True
+                        last_tick = ticks_ms() # Reset timer to avoid immediate retry
 
     except KeyboardInterrupt:
         print("Stopping WiFi Manager by user")
