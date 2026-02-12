@@ -4,6 +4,7 @@ Docstring for main
 from utime import sleep_ms, ticks_ms, ticks_diff
 import gc
 import ujson
+import os
 
 # Import sensor and wifi classes
 from sensor_sr04 import SensorSR04
@@ -37,52 +38,101 @@ ECHO_PIN = 4
 LED_PIN = 8
 
 """ Main program loop """
-temp_sensor = Sensor_DHT22(pin=DHT22_PIN, 
-                           internal_pullup=False)
 
-level_sensor = SensorSR04(trig_pin=TRIGGER_PIN, 
-                          echo_pin=ECHO_PIN, 
-                          sensor_offset=SENSOR_OFFSET)
-
-tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
-                          h_rectangle=H_RECTANGLE, 
-                          h_trapeze=H_TRAPEZE, 
-                          min_width=MIN_WIDTH, 
-                          max_width=MAX_WIDTH)
-
-wifi = WifiManager(ssid=WIFI_SSID, 
-                   password=WIFI_PASSWORD,
-                   led_pin=LED_PIN,
-                   led_polarity=LED_POLARITY)
+state = "INIT"
 
 try: 
     while True:
-        sleep_ms(5000)
+        if state == "INIT":
+            print("INIT state")
+            try:
+                temp_sensor = Sensor_DHT22(pin=DHT22_PIN, 
+                                        internal_pullup=False)
+                
+                level_sensor = SensorSR04(trig_pin=TRIGGER_PIN, 
+                                        echo_pin=ECHO_PIN, 
+                                        sensor_offset=SENSOR_OFFSET)
 
-        # Perform the mesurement of temperature and humidity
-        temp, hum = temp_sensor.read()
-        if temp is not None and hum is not None:
-            print('Temperature: %3.1f °C' % temp)
-            print('Humidity: %3.1f %%' % hum)
-        else:
-            print('Failed to read from temperature and humidity sensor.')
+                tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
+                                        h_rectangle=H_RECTANGLE, 
+                                        h_trapeze=H_TRAPEZE, 
+                                        min_width=MIN_WIDTH, 
+                                        max_width=MAX_WIDTH)
 
-        # Perform the measurement and record the fuel oil level
-        distance = level_sensor.read(temperature_c=temp if temp is not None else 20.0)
-        liters = tank.to_liters(tank.tank_height - distance)
-        print('Fuel oil volume: {:.2f} liters'.format(liters))
+                wifi = WifiManager(ssid=WIFI_SSID, 
+                                password=WIFI_PASSWORD,
+                                led_pin=LED_PIN,
+                                led_polarity=LED_POLARITY)
+                wifi.start()
+                
+                state = "MEASURE"
+            except Exception as e:
+                print("Initialization error:", e)
+            
+        elif state == "MEASURE":
+            print("MEASURE state")
+            try: 
+                temp, hum = temp_sensor.read()
+                distance = level_sensor.read(temperature_c=temp if temp is not None else 20.0)
+                liters = tank.to_liters(tank.tank_height - distance)
+                
+                state = "CONNECT"
+                print("CONNECT state")
+#                 state = "SAVE_DATA"
+            except Exception as e:
+                print("Measurement error:", e)
 
-        donnees = {
-            "temperature": str(temp) + "°C" if temp is not None else "N/A",
-            "humidity": str(hum) + "%" if hum is not None else "N/A",
-            "volume": str(liters) + "L" if liters is not None else "N/A",
-        }
+        elif state == "CONNECT":
+            try:
+                wifi.enable_connection = True
+                if wifi.is_connected:
+                    print("WiFi connected successfully")
+                    state = "FLUSH_DATA"
+                elif wifi.connection_failed:
+                    print("WiFi connection failed")
+                    state = "SAVE_DATA"
+            except Exception as e:
+                print("WiFi connection error:", e)
+            
+        elif state == "FLUSH_DATA":
+            print("FLUSH_DATA state")
+            state = "SEND_DATA"
+        
+        elif state == "SAVE_DATA":
+            print("SAVE_DATA state")
 
-        with open("data.json", "a") as f:
-            ujson.dump(donnees, f)
-            f.write("\n")
-        print("Data saved to data.json")
-        print("-------------------------------")
+            donnees = {
+                "temperature": str(temp) + "°C" if temp is not None else "N/A",
+                "humidity": str(hum) + "%" if hum is not None else "N/A",
+                "volume": str(liters) + "L" if liters is not None else "N/A",
+            }
+
+            with open("data.json", "a") as f:
+                ujson.dump(donnees, f)
+                f.write("\n")
+            print("Data saved to data.json")
+
+            state = "SEND_DATA"
+
+        elif state == "SEND_DATA":
+            print("SEND_DATA state")
+            if temp is not None and hum is not None:
+                print('Temperature: %3.1f °C' % temp)
+                print('Humidity: %3.1f %%' % hum)
+            else:
+                print('Failed to read from temperature and humidity sensor.')
+            
+            print('Fuel oil volume: {:.2f} liters'.format(liters))
+
+            state = "SLEEP"
+
+        elif state == "SLEEP":
+            print("SLEEP state")
+            print("-------------------------------")
+            wifi.enable_connection = False
+            sleep_ms(5000)
+
+            state = "MEASURE"
 
 except KeyboardInterrupt:
     print("Program interrupted by user")
