@@ -119,6 +119,9 @@ class WifiManager:
             if self._state == self.STATE_DISCONNECTED:
                 gc.collect() # Clean up before connection attempt
                 self.wlan.disconnect()
+                self.is_connected = False
+                self.has_connectivity = False
+                self.connection_failed = False
                 self._set_led(True)
                 if self.enable_connection:
                     if self._verbose: print("[WiFi] Connection enabled, starting connection procedure...")
@@ -235,6 +238,9 @@ class WifiManager:
 
         self._fsm_timer.deinit()
         self.wlan.disconnect()
+        self.is_connected = False
+        self.has_connectivity = False
+        self.connection_failed = False
         self._set_led(False)
         self._state = self.STATE_DISCONNECTED
     
