@@ -49,7 +49,8 @@ class WifiManager:
                  max_retries: int = 5,
                  retry_delay: int = 2,
                  connect_timeout: int = 20,
-                 max_error_count: int = 3) -> None:
+                 max_error_count: int = 3,
+                 verbose: bool = True) -> None:
         # Control flags and status indicators
         self.enable_connection = False
         self.is_connected = False
@@ -63,6 +64,7 @@ class WifiManager:
         self._retry_delay = retry_delay
         self._connect_timeout = connect_timeout
         self._max_error_count = max_error_count
+        self._verbose = verbose
 
         # Internal state variables for FSM and LED management
         self._attempt_count = 0
@@ -119,8 +121,7 @@ class WifiManager:
                 self.wlan.disconnect()
                 self._set_led(True)
                 if self.enable_connection:
-                    print("[WiFi] Connection enabled.")
-                    print("[WiFi] Starting procedure...")
+                    if self._verbose: print("[WiFi] Connection enabled, starting connection procedure...")
                     self._attempt_count = 0
                     self.connection_failed = False
                     self._state = self.STATE_CONNECTING
@@ -139,18 +140,18 @@ class WifiManager:
                         try :
                             self.wlan.connect(self._ssid, self._password)
                             self._attempt_count += 1
-                            print(f"[WiFi] Attempt {self._attempt_count}/{self._max_retries}")
+                            if self._verbose: print(f"[WiFi] Attempt {self._attempt_count}/{self._max_retries}")
                             self._last_action_ms = now
                         except Exception as e:
-                            print(f"[WiFi Error] Driver currently busy: {e}")
+                            if self._verbose: print(f"[WiFi Error] Driver currently busy: {e}")
                             pass
                     elif not self.enable_connection:
                         self._error_count = 0
                         self._state = self.STATE_DISCONNECTED
                         self._last_action_ms = now
-                        print("[WiFi] Connection disabled.")
+                        if self._verbose: print("[WiFi] Connection disabled.")
                     else:
-                        print("[WiFi] Total failure.")
+                        if self._verbose: print("[WiFi] Total failure.")
                         self._error_count += 1
                         self._state = self.STATE_ERROR
                         self._last_action_ms = now
@@ -169,21 +170,21 @@ class WifiManager:
             elif self._state == self.STATE_CONNECTED:
                 self._set_led(False)
                 if not self.wlan.isconnected():
-                    print("[WiFi] Link lost!")
+                    if self._verbose: print("[WiFi] Link lost!")
                     self.is_connected = False
                     self._state = self.STATE_DISCONNECTED
                     gc.collect() # Clean up after disconnection
                 elif not self.enable_connection:
                     self._error_count = 0
                     self._state = self.STATE_DISCONNECTED
-                    print("[WiFi] Connection disabled.")
+                    if self._verbose: print("[WiFi] Connection disabled.")
 
             # --- STATE: ERROR (Pause before reset) ---
             elif self._state == self.STATE_ERROR:
                 # Fast blink
                 self._set_led(self._tick_count % 2 == 0)
                 if self._error_count >= self._max_error_count:
-                    print("[WiFi] Maximum error count reached. Stopping attempts.")
+                    if self._verbose: print("[WiFi] Maximum error count reached. Stopping attempts.")
                     self._error_count = 0
                     self.enable_connection = False
                     self.connection_failed = True
@@ -193,11 +194,11 @@ class WifiManager:
                 elif not self.enable_connection:
                     self._error_count = 0
                     self._state = self.STATE_DISCONNECTED
-                    print("[WiFi] Connection disabled.")
+                    if self._verbose: print("[WiFi] Connection disabled.")
 
         except Exception as e:
             # If an error occurs, we do NOT kill the timer, we just print
-            print(f"[WiFi Critical Error] {e}")
+            if self._verbose: print(f"[WiFi Critical Error] {e}")
 
     def _timer_callback(self, t: Timer) -> None:
         """
@@ -218,7 +219,7 @@ class WifiManager:
         :return: None
         :rtype: None
         """
-        print("[WiFi] Manager started")
+        if self._verbose: print("[WiFi] Manager started")
         # We trigger the measurement every 200ms to give time to the SDK
         self._fsm_timer.init(period=200, mode=Timer.PERIODIC, callback=self._timer_callback)
 
@@ -230,6 +231,7 @@ class WifiManager:
         :rtype: None
         """
         gc.collect() # Clean up before stopping
+        if self._verbose: print("[WiFi] Manager stopped")
 
         self._fsm_timer.deinit()
         self.wlan.disconnect()
@@ -277,7 +279,7 @@ if __name__ == "__main__":
     from utime import sleep, ticks_ms, ticks_diff
     
     config = hotspot
-    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO")
+    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO", verbose=True)
     
     wifi.start()
     wifi.enable_connection = True
