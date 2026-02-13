@@ -4,7 +4,8 @@ Docstring for main
 from utime import sleep_ms, ticks_ms, ticks_diff
 import gc
 import ujson
-import os
+import uerrno
+import uos
 
 # Import sensor and wifi classes
 from sensor_sr04 import SensorSR04
@@ -96,6 +97,22 @@ try:
             
         elif state == "FLUSH_DATA":
             print("FLUSH_DATA state")
+            try:
+                with open("data.json", "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        object = ujson.loads(line)
+                        print("Flushing data:", object)
+                uos.remove("data.json")
+                print("data.json flushed successfully")                                 # TODO: Implement actual data transmission to server
+            except Exception as e:
+                if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
+                    print("No data to flush (data.json not found)")
+                else:
+                    print("Error reading data.json:", e)
+
             state = "SEND_DATA"
         
         elif state == "SAVE_DATA":
