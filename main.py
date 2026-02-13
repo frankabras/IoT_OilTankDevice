@@ -88,6 +88,17 @@ try:
                 wifi.enable_connection = True
                 if wifi.is_connected:
                     print("WiFi connected successfully")
+                    for _ in range(3):
+                        try:
+                            ntptime.settime()
+                            print("RTC synchronized with NTP server")
+                            print("Current time (UTC):", localtime())
+                            break
+                        except Exception as e:
+                            sleep_ms(1000)
+                    else:
+                        print("Failed to synchronize RTC after retries")
+
                     state = "FLUSH_DATA"
                 elif wifi.connection_failed:
                     print("WiFi connection failed")
