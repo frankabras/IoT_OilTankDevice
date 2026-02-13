@@ -27,7 +27,7 @@ Oil Level IoT is a self‑powered IoT project (currently under development) desi
 
 ## Hardware
 
-- **MCU:** ESP8266 (used as a module, targeting reduced power consumption through low‑power modes).
+- **MCU:** ESP32-C3 (used as a module, targeting reduced power consumption through low‑power modes).
 - **Level sensor:** SR04T (waterproof ultrasonic sensor).
 - **Temperature/humidity sensor:** DHT22.
 - **(Optional) Waterproof temperature sensor:** DS18B20 (1‑Wire), to measure temperature near the ultrasonic sensor and apply speed‑of‑sound compensation to improve level calculation accuracy.
