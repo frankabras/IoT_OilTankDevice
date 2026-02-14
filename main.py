@@ -98,9 +98,9 @@ def connection():
     except Exception as e:
         print("Connection error:", e)
 
-def update_rtc():                                                                           # TODO: Add parameter for retry count
+def update_rtc(retry_count: int = 3):
     """ Update RTC time from NTP server """
-    for _ in range(3):
+    for _ in range(retry_count):
         try:
             ntptime.settime()
             print("RTC synchronized with NTP server")
@@ -111,25 +111,25 @@ def update_rtc():                                                               
     else:
         print("Failed to synchronize RTC after retries")
 
-def flush_data():                                                                           # TODO: Add parameter for json filename 
+def flush_data(json_filename: str = "data.json"):
     """ Flush saved data to server and clear local storage """
     try:
-        with open("data.json", "r") as f:
+        with open(json_filename, "r") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 object = ujson.loads(line)
                 print("Flushing data:", object)
-        uos.remove("data.json")
-        print("data.json flushed successfully")                                             # TODO: Implement actual data transmission to server
+        uos.remove(json_filename)
+        print(json_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
     except Exception as e:
         if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
-            print("No data to flush (data.json not found)")
+            print("No data to flush (" + json_filename + " not found)")
         else:
-            print("Error reading data.json:", e)
+            print("Error reading " + json_filename + ":", e)
 
-def save_data(temp, hum, liters):                                                           # TODO: Add parameter for json filename and datetime
+def save_data(temp, hum, liters, json_filename: str = "data.json"):
     """ Save measurement data to local file """
     try:
         data = {
@@ -137,10 +137,10 @@ def save_data(temp, hum, liters):                                               
             "humidity": str(hum) + "%" if hum is not None else "N/A",
             "volume": str(liters) + "L" if liters is not None else "N/A",
         }
-        with open("data.json", "a") as f:
+        with open(json_filename, "a") as f:
             ujson.dump(data, f)
             f.write("\n")
-        print("Data saved to data.json")
+        print("Data saved to " + json_filename)
     except Exception as e:
         print("Error saving data:", e)
 
