@@ -75,9 +75,9 @@ def init_components():
 def measurment():
     """ Perform sensor measurements and return results """
     try:
-        temp, hum = temp_sensor.read()                                                      # TODO: 2 decimal places for temperature and humidity (returned from read method)
+        temp, hum = temp_sensor.read()
         distance = level_sensor.read(temperature_c=temp if temp is not None else 20.0)
-        liters = tank.to_liters(tank.tank_height - distance)                                # TODO: 2 decimal places for liters (returned from to_liters method)
+        liters = tank.to_liters(tank.tank_height - distance)
         return temp, hum, liters
     except Exception as e:
         print("Measurement error:", e)
