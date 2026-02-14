@@ -58,7 +58,7 @@ class Sensor_DHT22:
         except OSError:
             print('Sensor reading failed.')
         finally:
-            return self.temperature, self.humidity # return the read values or last known values
+            return round(self.temperature, 1), round(self.humidity, 1)
     
 if __name__ == "__main__":
     from utime import sleep

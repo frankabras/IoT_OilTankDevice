@@ -124,4 +124,4 @@ class HexagonalPrismTank(VolumeCalculator):
         if volume < 0:
             volume = 0
 
-        return volume
+        return round(volume, 2)

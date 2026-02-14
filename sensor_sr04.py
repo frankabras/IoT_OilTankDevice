@@ -146,11 +146,11 @@ class SensorSR04:
         distances.sort()
         if samples % 2:
             # If odd number of samples
-            return distances[samples // 2]
+            return round(distances[samples // 2], 2)
         else:
             # If even number of samples
             mid = samples // 2
-            return (distances[mid - 1] + distances[mid]) / 2
+            return round((distances[mid - 1] + distances[mid]) / 2, 2)
 
 if __name__ == "__main__":
     from volume_calculator import HexagonalPrismTank
