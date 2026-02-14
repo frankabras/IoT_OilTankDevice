@@ -33,49 +33,35 @@ ECHO_PIN = 4
 # LED indicator for WiFi status
 LED_PIN = 8
 
-""" Function definitions """
-
-def init_components(): 
-    """ Initialize sensors, WiFi, and other components """
-    try:
-        temp_sensor = Sensor_DHT22(pin=DHT22_PIN, 
-                                    internal_pullup=False)
-        
-        level_sensor = SensorSR04(trig_pin=TRIGGER_PIN, 
-                                    echo_pin=ECHO_PIN, 
-                                    sensor_offset=SENSOR_OFFSET)
-
-        tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
-                                    h_rectangle=H_RECTANGLE, 
-                                    h_trapeze=H_TRAPEZE, 
-                                    min_width=MIN_WIDTH, 
-                                    max_width=MAX_WIDTH)
-
-        wifi = WifiManager(ssid=WIFI_SSID, 
-                            password=WIFI_PASSWORD,
-                            led_pin=LED_PIN,
-                            led_polarity=LED_POLARITY)
-        wifi.start()
-        
-        return temp_sensor, level_sensor, tank, wifi
-    except Exception as e:
-        print("Initialization error:", e)
-        return None, None, None, None
-
-
 """ Main program loop """
 
-state = "INIT"
+print("Starting IoT Oil Tank Device...")
+print("Initializing components...")
+temp_sensor = Sensor_DHT22(pin=DHT22_PIN, 
+                           internal_pullup=False)
+
+level_sensor = SensorSR04(trig_pin=TRIGGER_PIN, 
+                            echo_pin=ECHO_PIN, 
+                            sensor_offset=SENSOR_OFFSET)
+
+tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
+                            h_rectangle=H_RECTANGLE, 
+                            h_trapeze=H_TRAPEZE, 
+                            min_width=MIN_WIDTH, 
+                            max_width=MAX_WIDTH)
+
+wifi = WifiManager(ssid=WIFI_SSID, 
+                    password=WIFI_PASSWORD,
+                    led_pin=LED_PIN,
+                    led_polarity=LED_POLARITY)
+print("Initialization complete. Entering main loop...")
+
+wifi.start()
+state = "MEASURE"
 
 try: 
-    while True:
-        if state == "INIT":
-            print("[STATE] INIT")
-            temp_sensor, level_sensor, tank, wifi = init_components()
-            if None not in (temp_sensor, level_sensor, tank, wifi):
-                state = "MEASURE"
-            
-        elif state == "MEASURE":
+    while True:            
+        if state == "MEASURE":
             print("[STATE] MEASURE")
             temp, hum, liters = measurment(temp_sensor, level_sensor, tank)
             if None not in (temp, hum, liters):
