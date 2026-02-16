@@ -4,7 +4,7 @@ import uos
 import ntptime
 import gc
 
-from utime import sleep_ms, localtime
+from utime import sleep_ms, mktime, gmtime, time
 
 # -----------------------------------------------------------------------------
 # region FSM logic
@@ -109,13 +109,60 @@ def go_sleep(wifi):
 # -----------------------------------------------------------------------------
 # region DATE & TIME
 # -----------------------------------------------------------------------------
+def last_sunday(year, month):
+    # Returns the last Sunday of the given month and year
+
+    # Determine next month and year based on current month
+    if month == 12:
+        next_month = (year + 1, 1)
+    else:
+        next_month = (year, month + 1)
+
+    # timestamp for first day of next month at 00:00 UTC then go back one day
+    t = mktime((next_month[0], next_month[1], 1, 0, 0, 0, 0, 0))
+    t -= 24 * 3600
+    tm = gmtime(t)
+    # How many days to subtract to reach Sunday (tm[6] : 0=Monday ... 6=Sunday)
+    days_back = (tm[6] + 1) % 7
+    return tm[2] - days_back
+
+def is_dst_brussels(utc_tm):
+    year = utc_tm[0]
+    month = utc_tm[1]
+    day = utc_tm[2]
+    hour = utc_tm[3]
+
+    # DST in Europe: last Sunday of March at 01:00 UTC
+    # ends last Sunday of October at 01:00 UTC
+    if month < 3 or month > 10:
+        return False
+    if 3 < month < 10:
+        return True
+
+    if month == 3:
+        last = last_sunday(year, 3)
+        # DST starts at 01:00 UTC
+        # Return True if we're past the last Sunday of March or it's the last Sunday and past 01:00 UTC
+        return (day > last) or (day == last and hour >= 3)
+
+    if month == 10:
+        last = last_sunday(year, 10)
+        # DST ends at 01:00 UTC
+        # Return True if we're before the last Sunday of October or it's the last Sunday and before 01:00 UTC
+        return (day < last) or (day == last and hour < 3) 
+
+def localtime_brussels():
+    utc = gmtime()  # UTC
+    offset = 2 if is_dst_brussels(utc) else 1  # UTC+2 in summer, UTC+1 in winter
+    return gmtime(time() + offset * 3600)
+
 def update_rtc(retry_count: int = 3):
     """ Update RTC time from NTP server """
     for _ in range(retry_count):
         try:
             ntptime.settime()
             print("RTC synchronized with NTP server")
-            print("Current time (UTC):", localtime())                                       # TODO: Convert to local time
+            print("Current time (Brussels):", localtime_brussels())                                   # TODO: Convert to local time
             break
         except Exception as e:
             sleep_ms(1000)
