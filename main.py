@@ -84,13 +84,13 @@ try:
         
         elif state == "SAVE_DATA":
             print("[STATE] SAVE_DATA")
-            save_data(temp, hum, liters)
+            save_data(current_date, current_time, temp, hum, liters)
 
             state = "SEND_DATA"                                                             # NOTE: Change to "SLEEP" when testing is complete to avoid sending data when offline
 
         elif state == "SEND_DATA":
             print("[STATE] SEND_DATA")
-            send_data(temp, hum, liters)
+            send_data(current_date, current_time, temp, hum, liters)
 
             state = "SLEEP"
 
