@@ -154,7 +154,17 @@ def is_dst_brussels(utc_tm):
 def localtime_brussels():
     utc = gmtime()  # UTC
     offset = 2 if is_dst_brussels(utc) else 1  # UTC+2 in summer, UTC+1 in winter
-    return gmtime(time() + offset * 3600)
+    # Calculate local time by adding the offset to the current UTC time
+    local_time = gmtime(time() + offset * 3600)
+    # Format local time as date and time strings (not used in return value but can be useful for debugging)
+    date_str = "{:02d}/{:02d}/{:04d}".format(local_time[2], # day
+                                             local_time[1], # month
+                                             local_time[0]) # year
+    time_str = "{:02d}:{:02d}:{:02d}".format(local_time[3], # hour
+                                             local_time[4], # minute
+                                             local_time[5]) # second
+
+    return date_str, time_str
 
 def update_rtc(retry_count: int = 3):
     """ Update RTC time from NTP server """
@@ -162,12 +172,15 @@ def update_rtc(retry_count: int = 3):
         try:
             ntptime.settime()
             print("RTC synchronized with NTP server")
-            print("Current time (Brussels):", localtime_brussels())                                   # TODO: Convert to local time
-            break
+            current_date, current_time = localtime_brussels()
+            print("Current date (Brussels):", current_date)
+            print("Current time (Brussels):", current_time)
+            return current_date, current_time
         except Exception as e:
             sleep_ms(1000)
     else:
         print("Failed to synchronize RTC after retries")
+        return None, None
 
 # endregion
 

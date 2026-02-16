@@ -71,7 +71,7 @@ try:
         elif state == "CONNECT":
             connection_result = connection(wifi)
             if connection_result is True:
-                update_rtc()
+                current_date, current_time = update_rtc()
                 state = "FLUSH_DATA"
             elif connection_result is False:
                 state = "SAVE_DATA"
