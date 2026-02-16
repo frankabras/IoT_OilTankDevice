@@ -49,46 +49,50 @@ def connection(wifi):
     except Exception as e:
         print("Connection error:", e)
 
-def flush_data(json_filename: str = "data.json"):
+def flush_data(csv_filename: str = "data.csv"):
     """
-    Read data from the specified JSON file, print it, and delete the file.
+    Read data from the specified CSV file, print it, and delete the file.
     """
     try:
-        with open(json_filename, "r") as f:
+        with open(csv_filename, "r") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                object = ujson.loads(line)
-                print("Flushing data:", object)
-        uos.remove(json_filename)
-        print(json_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
+                data = line.split(",")
+                print("Flushing data:")
+                print("Date: {} - {}: Temp: {}°C, Hum: {}%, Vol: {}L".format(data[0],
+                                                                             data[1],
+                                                                             data[2],
+                                                                             data[3],
+                                                                             data[4]))
+        uos.remove(csv_filename)
+        print(csv_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
     except Exception as e:
         if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
-            print("No data to flush (" + json_filename + " not found)")
+            print("No data to flush (" + csv_filename + " not found)")
         else:
-            print("Error reading " + json_filename + ":", e)
+            print("Error reading " + csv_filename + ":", e)
 
-def save_data(temp, hum, liters, json_filename: str = "data.json"):
+def save_data(date, time, temp, hum, liters, csv_filename: str = "data.csv"):
     """
-    Save the provided data to a JSON file. Each entry is saved as a separate line in the file.
+    Save the provided data to a CSV file. Each entry is saved as a separate line in the file.
     """
     try:
-        data = {                                                                            # TODO: Add datetime field in ISO format (e.g., "2024-06-01T12:00:00")
-            "temperature": str(temp) + "°C" if temp is not None else "N/A",
-            "humidity": str(hum) + "%" if hum is not None else "N/A",
-            "volume": str(liters) + "L" if liters is not None else "N/A",
-        }
-        with open(json_filename, "a") as f:
-            ujson.dump(data, f)
-            f.write("\n")
-        print("Data saved to " + json_filename)
+        line = "{},{},{},{},{}\n".format(date, time, temp, hum, liters)
+
+        with open(csv_filename, "a") as f:
+            f.write(line)
+        print("Data saved to " + csv_filename)
     except Exception as e:
         print("Error saving data:", e)
 
-def send_data(temp, hum, liters):                                                           # TODO: Add parameters for datetime
+def send_data(date, time, temp, hum, liters):
     """ Send current measurement data to server """
     try:
+        print("Sending data to server:")
+        print("Date:", date)
+        print("Time:", time)
         if temp is not None and hum is not None:
             print('Temperature: %3.1f °C' % temp)
             print('Humidity: %3.1f %%' % hum)
@@ -163,6 +167,9 @@ def localtime_brussels():
     time_str = "{:02d}:{:02d}:{:02d}".format(local_time[3], # hour
                                              local_time[4], # minute
                                              local_time[5]) # second
+    
+    # print("Current date (Brussels):", current_date)
+    # print("Current time (Brussels):", current_time)
 
     return date_str, time_str
 
@@ -172,15 +179,10 @@ def update_rtc(retry_count: int = 3):
         try:
             ntptime.settime()
             print("RTC synchronized with NTP server")
-            current_date, current_time = localtime_brussels()
-            print("Current date (Brussels):", current_date)
-            print("Current time (Brussels):", current_time)
-            return current_date, current_time
         except Exception as e:
             sleep_ms(1000)
     else:
         print("Failed to synchronize RTC after retries")
-        return None, None
 
 # endregion
 
