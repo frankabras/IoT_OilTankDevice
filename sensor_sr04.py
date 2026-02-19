@@ -1,4 +1,4 @@
-from machine import Pin, time_pulse_us
+from machine import Pin, time_pulse_us, UART
 from utime import sleep, sleep_ms, sleep_us
 
 DEFAULT_OFFSET = 20.0 # default sensor blind zone in cm
@@ -159,7 +159,87 @@ class PulseSR04(BaseSR04):
         self._trigger()
         duration = self._measure_echo()
         speed_cm_us = self._calc_sound_speed(temperature_c)
-        return self._raw_to_distance(duration, speed_cm_us)            
+        return self._raw_to_distance(duration, speed_cm_us)
+
+class SerialSR04(BaseSR04):
+    """
+    Docstring for SerialSR04
+
+    NOTE: The operation mode (Pulse, Pulse low power, Serial) is determined by 
+    the resistor value soldered at the R19/R27 location on the sensor board.
+    Refer to the sensor documentation for configuration details.
+
+    Args:
+        tx_pin (int): GPIO pin connected to the TX pin of the sensor.
+        rx_pin (int): GPIO pin connected to the RX pin of the sensor.
+        uart_id (int, optional): UART ID to use for communication. Default is 1.
+        uart_timeout_ms (int, optional): Timeout for UART communication in milliseconds. 
+            Default is 100ms.
+        check_attempts (int, optional): Number of attempts to check for valid data after trigger command. 
+            Default is 10.
+        sensor_offset (float, optional): Offset in centimeters to account for sensor blind zone. 
+            Default is DEFAULT_OFFSET.
+
+    Methods:
+        read_once(temperature_c: float = 20.0) -> float:
+            Send a trigger command to the sensor and read the distance measurement from the UART interface.
+    """
+    def __init__(self,
+                 tx_pin: int,
+                 rx_pin: int,
+                 uart_id: int = 1,
+                 uart_timeout_ms: int = 100,
+                 check_attempts: int = 10,
+                 sensor_offset: float = DEFAULT_OFFSET) -> None:
+        
+        super().__init__(sensor_offset)
+        self.check_attempts = check_attempts
+        self.tx = Pin(tx_pin)
+        self.rx = Pin(rx_pin)
+        self.timeout_ms = uart_timeout_ms
+        self.uart = UART(uart_id, 
+                         baudrate=9600,
+                         bits=8,
+                         parity=None,
+                         stop=1,
+                         tx=self.tx,
+                         rx=self.rx,
+                         timeout=uart_timeout_ms)
+    
+    def read_once(self,
+                  _temperature_c: float = 20.0) -> float:
+        """
+        Read the distance from the sensor once using UART communication and convert it to centimeters.
+        
+        :param _temperature_c: Temperature in degrees Celsius (not used in UART mode)
+        :return: Distance from the sensor to the object in centimeters, or -1.0 if there was a timeout or error
+        """
+        
+        check_interval_ms = self.timeout_ms // self.check_attempts        
+
+        # clear any existing data in the buffer
+        self.uart.read()
+
+        # send trigger command
+        self.uart.write(b'\x01')
+        
+        # data format: [0xFF, high_byte, low_byte, checksum]
+        for _ in range(self.check_attempts):
+            if self.uart.any() >= 4:
+                data = self.uart.read(4)
+
+                # validate data format and checksum
+                # calculation: (0xFF + high_byte + low_byte) & 0xFF == Checksum
+                is_valid_format = data[0] == 0xFF
+                is_checksum_ok = sum(data[:3]) & 0xFF == data[3]
+
+                if is_valid_format and is_checksum_ok:
+                    distance_mm = (data[1] << 8) + data[2]
+                    return (distance_mm / 10.0) - self.sensor_offset
+                
+            sleep_ms(check_interval_ms)
+        else:
+            return -1.0  # indicate timeout or error            
 
 if __name__ == "__main__":
     from volume_calculator import HexagonalPrismTank
