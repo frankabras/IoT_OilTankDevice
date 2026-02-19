@@ -19,11 +19,6 @@ class WifiManager:
         connect_timeout (int, optional): Timeout in seconds for each connection attempt. Defaults to 20.
 
     Attributes:
-        ssid (str): WiFi SSID to connect to.
-        password (str): WiFi password.
-        max_retries (int): Maximum number of connection attempts before giving up.
-        retry_delay (int): Delay in seconds between connection attempts.
-        connect_timeout (int): Timeout in seconds for each connection attempt.
         enable_connection (bool): Flag to enable or disable the connection process.
         is_connected (bool): Flag indicating whether the device is currently connected to WiFi.
         has_connectivity (bool): Flag indicating whether the device has internet connectivity.
@@ -95,9 +90,7 @@ class WifiManager:
         Set the LED state.
 
         :param state: The desired LED state (True for on, False for off).
-        :type state: bool
         :return: None
-        :rtype: None
         """
         if self._led:
             self._led.value(int(state) ^ self._led_polarity_mask)
@@ -107,9 +100,7 @@ class WifiManager:
         Finite State Machine logic for WiFi management.
 
         :param _: Placeholder for timer callback parameter.
-        :type _: any
         :return: None
-        :rtype: None
         """
         try:
             now = utime.ticks_ms()
@@ -208,9 +199,7 @@ class WifiManager:
         Timer callback for the WiFi manager.
         
         :param t: The timer object triggering the callback.
-        :type t: Timer
         :return: None
-        :rtype: None
         """
         # We do NOTHING here, we delegate everything to the scheduler
         micropython.schedule(self._fsm_ref, 0)
@@ -220,7 +209,6 @@ class WifiManager:
         Start the WiFi manager FSM.
         
         :return: None
-        :rtype: None
         """
         if self._verbose: print("[WiFi] Manager started")
         # We trigger the measurement every 200ms to give time to the SDK
@@ -231,7 +219,6 @@ class WifiManager:
         Stop the WiFi manager FSM.
         
         :return: None
-        :rtype: None
         """
         gc.collect() # Clean up before stopping
         if self._verbose: print("[WiFi] Manager stopped")
@@ -252,13 +239,9 @@ class WifiManager:
         Check internet connectivity by attempting to connect to a specified host and port.
         
         :param host: The host to connect to (default is Google's DNS server 8.8.8.8).
-        :type host: str
         :param port: The port to connect to (default is 53, DNS service).
-        :type port: int
         :param timeout: The timeout for the connection attempt in seconds (default is 3).
-        :type timeout: int
         :return: True if the internet is reachable, False otherwise.
-        :rtype: bool
         """
         if not self.is_connected:
             return False
