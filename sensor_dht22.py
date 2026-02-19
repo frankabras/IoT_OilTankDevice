@@ -43,7 +43,6 @@ class Sensor_DHT22:
         Read temperature and humidity from the DHT22 sensor.
         
         :return: Tuple containing temperature in °C and humidity in %
-        :rtype: tuple[float, float] | tuple[None, None] if first measure fails
         """
         now = ticks_ms()
         if ticks_diff(now, self._last_read_time) < self.MIN_INTERVAL:
