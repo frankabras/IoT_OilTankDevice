@@ -2,7 +2,7 @@ from machine import Pin
 from utime import ticks_ms, ticks_diff
 import dht
 
-class Sensor_DHT22:
+class SensorDHT22:
     """
     Class to handle DHT22 temperature and humidity sensor.
     
@@ -62,8 +62,8 @@ class Sensor_DHT22:
 if __name__ == "__main__":
     from utime import sleep
 
-    sensor = Sensor_DHT22(pin=2,
-                          internal_pullup=False)
+    sensor = SensorDHT22(pin=2,
+                         internal_pullup=False)
 
     while True:
         temp, hum = sensor.read()

@@ -3,8 +3,8 @@ Docstring for main
 """
 from utils import *
 # Import sensor and wifi classes
-from sensor_sr04 import SensorSR04
-from sensor_dht22 import Sensor_DHT22
+from sensor_sr04 import PulseSR04
+from sensor_dht22 import SensorDHT22
 from volume_calculator import HexagonalPrismTank
 from wifi_manager import WifiManager
 from logging import *
@@ -37,18 +37,18 @@ LED_PIN = 8
 
 print("Starting IoT Oil Tank Device...")
 print("Initializing components...")
-temp_sensor = Sensor_DHT22(pin=DHT22_PIN, 
+temp_sensor = SensorDHT22(pin=DHT22_PIN, 
                            internal_pullup=False)
 
-level_sensor = SensorSR04(trig_pin=TRIGGER_PIN, 
-                            echo_pin=ECHO_PIN, 
-                            sensor_offset=SENSOR_OFFSET)
+level_sensor = PulseSR04(trig_pin=TRIGGER_PIN, 
+                          echo_pin=ECHO_PIN, 
+                          sensor_offset=SENSOR_OFFSET)
 
 tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
-                            h_rectangle=H_RECTANGLE, 
-                            h_trapeze=H_TRAPEZE, 
-                            min_width=MIN_WIDTH, 
-                            max_width=MAX_WIDTH)
+                          h_rectangle=H_RECTANGLE, 
+                          h_trapeze=H_TRAPEZE, 
+                          min_width=MIN_WIDTH, 
+                          max_width=MAX_WIDTH)
 
 wifi = WifiManager(ssid=WIFI_SSID, 
                     password=WIFI_PASSWORD,
