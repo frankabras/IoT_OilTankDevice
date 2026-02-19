@@ -11,12 +11,11 @@ from utime import sleep_ms, mktime, gmtime, time
 # -----------------------------------------------------------------------------
 def measurment(temp_sensor,
                level_sensor,
-               tank):
+               tank) -> tuple[float | None, float | None, float | None]:
     """
     Perform sensor measurements and return results.
     
     :return: Tuple of (temperature in °C, humidity in %, fuel volume in liters) or (None, None, None) on error
-    :rtype: Tuple[float | None, float | None, float | None]
     """
     try:
         temp, hum = temp_sensor.read()
@@ -27,14 +26,13 @@ def measurment(temp_sensor,
         print("Measurement error:", e)
         return None, None, None
 
-def connection(wifi):
+def connection(wifi) -> bool | None:
     """
     Test WiFi connection and NTP synchronization.
     
     :return: True if connected successfully, 
              False if connection failed, 
              None if still connecting
-    :rtype: bool | None
     """
     try:
         wifi.enable_connection = True
@@ -49,7 +47,7 @@ def connection(wifi):
     except Exception as e:
         print("Connection error:", e)
 
-def flush_data(csv_filename: str = "data.csv"):
+def flush_data(csv_filename: str = "data.csv") -> None:
     """
     Read data from the specified CSV file, print it, and delete the file.
     """
@@ -74,7 +72,12 @@ def flush_data(csv_filename: str = "data.csv"):
         else:
             print("Error reading " + csv_filename + ":", e)
 
-def save_data(date, time, temp, hum, liters, csv_filename: str = "data.csv"):
+def save_data(date,
+              time,
+              temp,
+              hum,
+              liters,
+              csv_filename: str = "data.csv") -> None:
     """
     Save the provided data to a CSV file. Each entry is saved as a separate line in the file.
     """
@@ -87,7 +90,11 @@ def save_data(date, time, temp, hum, liters, csv_filename: str = "data.csv"):
     except Exception as e:
         print("Error saving data:", e)
 
-def send_data(date, time, temp, hum, liters):
+def send_data(date,
+              time,
+              temp,
+              hum,
+              liters) -> None:
     """ Send current measurement data to server """
     try:
         print("Sending data to server:")
@@ -103,7 +110,7 @@ def send_data(date, time, temp, hum, liters):
     except Exception as e:
         print("Error sending data:", e)
 
-def go_sleep(wifi):
+def go_sleep(wifi) -> None:
     """ Enter low power sleep mode (not implemented) """
     wifi.enable_connection = False
     sleep_ms(5000)                                                                          # TODO: Implement actual deep sleep mode for power saving
@@ -113,7 +120,8 @@ def go_sleep(wifi):
 # -----------------------------------------------------------------------------
 # region DATE & TIME
 # -----------------------------------------------------------------------------
-def last_sunday(year, month):
+def last_sunday(year: int,
+                month: int) -> int:
     # Returns the last Sunday of the given month and year
 
     # Determine next month and year based on current month
@@ -130,7 +138,7 @@ def last_sunday(year, month):
     days_back = (tm[6] + 1) % 7
     return tm[2] - days_back
 
-def is_dst_brussels(utc_tm):
+def is_dst_brussels(utc_tm: tuple[int, int, int, int]) -> bool:
     year = utc_tm[0]
     month = utc_tm[1]
     day = utc_tm[2]
@@ -155,7 +163,7 @@ def is_dst_brussels(utc_tm):
         # Return True if we're before the last Sunday of October or it's the last Sunday and before 01:00 UTC
         return (day < last) or (day == last and hour < 3) 
 
-def localtime_brussels():
+def localtime_brussels() -> tuple[str, str]:
     utc = gmtime()  # UTC
     offset = 2 if is_dst_brussels(utc) else 1  # UTC+2 in summer, UTC+1 in winter
     # Calculate local time by adding the offset to the current UTC time
@@ -173,7 +181,7 @@ def localtime_brussels():
 
     return date_str, time_str
 
-def update_rtc(retry_count: int = 3):
+def update_rtc(retry_count: int = 3) -> None:
     """ Update RTC time from NTP server """
     for _ in range(retry_count):
         try:
