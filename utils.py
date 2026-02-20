@@ -23,7 +23,7 @@ def measurment(temp_sensor,
         liters = tank.to_liters(tank.tank_height - distance)
         return temp, hum, liters
     except Exception as e:
-        print("Measurement error:", e)
+        print("[MEASURE] Measurement error:", e)
         return None, None, None
 
 def connection(wifi) -> bool | None:
@@ -37,15 +37,15 @@ def connection(wifi) -> bool | None:
     try:
         wifi.enable_connection = True
         if wifi.is_connected:
-            print("WiFi connected successfully")
+            print("[CONNECT] WiFi connected successfully")
             return True
         elif wifi.connection_failed:
-            print("WiFi connection failed")
+            print("[CONNECT] WiFi connection failed")
             return False
         else:
             return None
     except Exception as e:
-        print("Connection error:", e)
+        print("[CONNECT] Connection error:", e)
 
 def flush_data(csv_filename: str = "data.csv") -> None:
     """
@@ -58,19 +58,19 @@ def flush_data(csv_filename: str = "data.csv") -> None:
                 if not line:
                     continue
                 data = line.split(",")
-                print("Flushing data:")
+                print("[FLUSH] Flushing data:")
                 print("Date: {} - {}: Temp: {}°C, Hum: {}%, Vol: {}L".format(data[0],
                                                                              data[1],
                                                                              data[2],
                                                                              data[3],
                                                                              data[4]))
         uos.remove(csv_filename)
-        print(csv_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
+        print("[FLUSH] " + csv_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
     except Exception as e:
         if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
-            print("No data to flush (" + csv_filename + " not found)")
+            print("[FLUSH] No data to flush (" + csv_filename + " not found)")
         else:
-            print("Error reading " + csv_filename + ":", e)
+            print("[FLUSH] Error reading " + csv_filename + ":", e)
 
 def save_data(date,
               time,
@@ -86,9 +86,9 @@ def save_data(date,
 
         with open(csv_filename, "a") as f:
             f.write(line)
-        print("Data saved to " + csv_filename)
+        print("[SAVE] Data saved to " + csv_filename)
     except Exception as e:
-        print("Error saving data:", e)
+        print("[SAVE] Error saving data:", e)
 
 def send_data(date,
               time,
@@ -97,7 +97,7 @@ def send_data(date,
               liters) -> None:
     """ Send current measurement data to server """
     try:
-        print("Sending data to server:")
+        print("[SEND]Sending data to server:")
         print("Date:", date)
         print("Time:", time)
         if temp is not None and hum is not None:
@@ -108,7 +108,7 @@ def send_data(date,
         
         print('Fuel oil volume: {:.2f} liters'.format(liters))
     except Exception as e:
-        print("Error sending data:", e)
+        print("[SEND] Error sending data:", e)
 
 def go_sleep(wifi) -> None:
     """ Enter low power sleep mode (not implemented) """
@@ -186,11 +186,12 @@ def update_rtc(retry_count: int = 3) -> None:
     for _ in range(retry_count):
         try:
             ntptime.settime()
-            print("RTC synchronized with NTP server")
+            print("[RTC] Synchronized with NTP server")
+            break
         except Exception as e:
             sleep_ms(1000)
     else:
-        print("Failed to synchronize RTC after retries")
+        print("[RTC] Failed to synchronize after retries")
 
 # endregion
 
