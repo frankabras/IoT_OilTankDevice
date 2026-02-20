@@ -197,6 +197,11 @@ def update_rtc(retry_count: int = 3) -> None:
 # -----------------------------------------------------------------------------
 # region MISC
 # -----------------------------------------------------------------------------
+def data_to_json(**kwargs) -> bytes:
+    data = {k: v for k, v in kwargs.items() if v is not None}
+    
+    return ujson.dumps(data).encode()
+
 def cleanup():
     """ Perform garbage collection and cleanup """
     gc.collect()
