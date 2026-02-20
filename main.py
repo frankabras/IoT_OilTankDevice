@@ -7,6 +7,7 @@ from sensor_sr04 import PulseSR04
 from sensor_dht22 import SensorDHT22
 from volume_calculator import HexagonalPrismTank
 from wifi_manager import WifiManager
+from mqtt_manager import MqttManager
 from logging import *
 
 """ Constant definitions """
@@ -19,10 +20,13 @@ MAX_WIDTH = 74.0
 # Level sensor blind zone in cm 
 SENSOR_OFFSET = 20.0
 # WiFi connection parameters
-WIFI_CONFIG = hotspot
+WIFI_CONFIG = home
 WIFI_SSID = WIFI_CONFIG["ssid"]
 WIFI_PASSWORD = WIFI_CONFIG["pswd"]                                                         # TODO: Improve security
 LED_POLARITY = "LO"
+# MQTT parameters
+MQTT_TOPIC_TANK = b"home/ext/oil_tank/measure/in_tank"
+MQTT_TOPIC_CASE = b"home/ext/oil_tank/measure/in_case"
 
 """ Pin definitions """
 # Temperature and humidity sensor (DHT22)
@@ -54,6 +58,11 @@ wifi = WifiManager(ssid=WIFI_SSID,
                     password=WIFI_PASSWORD,
                     led_pin=LED_PIN,
                     led_polarity=LED_POLARITY)
+
+mqtt = MqttManager(client_id=b"oil_tank_device_",
+                    broker_host="192.168.0.223", 
+                    broker_port=1883, 
+                    keepalive=60)
 print("Initialization complete. Entering main loop...")
 
 wifi.start()
@@ -70,7 +79,9 @@ try:
 
         elif state == "CONNECT":
             connection_result = connection(wifi)
+            
             if connection_result is True:
+                mqtt_result = mqtt.connect()
                 update_rtc()
                 current_date, current_time = localtime_brussels()
                 state = "FLUSH_DATA"
@@ -93,12 +104,19 @@ try:
         elif state == "SEND_DATA":
             print("[STATE] SEND_DATA")
             send_data(current_date, current_time, temp, hum, liters)
+            
+            data_tank = data_to_json(date=current_date, time=current_time, quantity_l=liters)
+            data_case = data_to_json(date=current_date, time=current_time, temp_c=temp, hum=hum)
+
+            mqtt.publish(topic=MQTT_TOPIC_TANK, message=data_tank)
+            mqtt.publish(topic=MQTT_TOPIC_CASE, message=data_case)
 
             state = "SLEEP"
 
         elif state == "SLEEP":
             print("[STATE] SLEEP")
             print("-------------------------------")
+            mqtt.disconnect()
             go_sleep(wifi)
 
             state = "MEASURE"
