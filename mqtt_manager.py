@@ -3,13 +3,6 @@ from machine import unique_id
 from utime import sleep_ms
 from umqtt.simple import MQTTClient
 
-# BROKER_HOST = "mqtt.example.com"
-# BROKER_PORT = 1883
-# KEEPALIVE = 60
-
-# MQTT_TOPIC_TANK = b"home/ext/oil_tank/measure/in_tank"
-# MQTT_TOPIC_CASE = b"home/ext/oil_tank/measure/in_case"
-
 class MqttManager:
     def __init__(self,
                  client_id: bytes,
@@ -67,3 +60,28 @@ class MqttManager:
         except Exception as e:
             print("[MQTT] Publish failed:", e)
             return False
+
+if __name__ == "__main__":
+    from wifi_manager import WifiManager
+    from logging import *
+
+    config = hotspot
+    wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO", verbose=True)
+    mqtt = MqttManager(client_id=b"test_client_", 
+                       broker_host="192.168.0.223", 
+                       broker_port=1883, 
+                       keepalive=60)
+    
+    wifi.start()
+    wifi.enable_connection = True
+
+    while True:
+        if wifi.is_connected:
+            if mqtt.connect():
+                mqtt.publish(topic=b"test/topic", message=b"Hello from ESP32")
+                mqtt.disconnect()
+            else:
+                print("Failed to connect to MQTT broker.")
+        else:
+            print("WiFi not connected.")
+        sleep_ms(5000)  # Wait before retrying
