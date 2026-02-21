@@ -103,13 +103,22 @@ try:
 
         elif state == "SEND_DATA":
             print("[STATE] SEND_DATA")
-            send_data(current_date, current_time, temp, hum, liters)
             
-            data_tank = data_to_json(date=current_date, time=current_time, quantity_l=liters)
-            data_case = data_to_json(date=current_date, time=current_time, temp_c=temp, hum=hum)
+            data_tank = data_to_json(date=current_date,
+                                     time=current_time,
+                                     quantity_l=liters)
+            
+            data_case = data_to_json(date=current_date,
+                                     time=current_time,
+                                     temp_c=temp,
+                                     hum=hum)
 
-            mqtt.publish(topic=MQTT_TOPIC_TANK, message=data_tank)
-            mqtt.publish(topic=MQTT_TOPIC_CASE, message=data_case)
+            msg_to_send = [
+                {"topic": MQTT_TOPIC_TANK, "payload": bytes(data_tank), "retain": False, "qos": 0},
+                {"topic": MQTT_TOPIC_CASE, "payload": bytes(data_case), "retain": False, "qos": 0}
+            ]
+
+            send_data(mqtt, messages=msg_to_send)
 
             state = "SLEEP"
 

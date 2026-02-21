@@ -90,23 +90,26 @@ def save_data(date,
     except Exception as e:
         print("[SAVE] Error saving data:", e)
 
-def send_data(date,
-              time,
-              temp,
-              hum,
-              liters) -> None:
-    """ Send current measurement data to server """
+def send_data(mqtt,
+              messages: list[dict]) -> None:
+    """
+    Send current measurement data to server via MQTT.
+    
+    :param mqtt: Initializes and connected MQTTManager instance.
+    :param messages: List of dictionaries containing 'topic', 'payload', and optional 'retain' and 'qos'.
+    """
     try:
-        print("[SEND]Sending data to server:")
-        print("Date:", date)
-        print("Time:", time)
-        if temp is not None and hum is not None:
-            print('Temperature: %3.1f °C' % temp)
-            print('Humidity: %3.1f %%' % hum)
-        else:
-            print('Failed to read from temperature and humidity sensor.')                   # TODO: Implement actual data transmission to server
-        
-        print('Fuel oil volume: {:.2f} liters'.format(liters))
+        for msg in messages:
+            topic = msg.get("topic")
+            payload = msg.get("payload")
+            retain = msg.get("retain", False)
+            qos = msg.get("qos", 0)
+
+            if topic is not None and payload is not None:
+                mqtt.publish(topic=topic, message=payload, retain=retain, qos=qos)
+                print(f"[SEND] {topic.decode()}: {payload.decode()} published successfully")
+            else:
+                print("[SEND] Invalid message format, missing topic or payload:", msg)
     except Exception as e:
         print("[SEND] Error sending data:", e)
 
