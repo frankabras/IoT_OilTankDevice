@@ -47,46 +47,59 @@ def connection(wifi) -> bool | None:
     except Exception as e:
         print("[CONNECT] Connection error:", e)
 
-def flush_data(csv_filename: str = "data.csv") -> None:
+def flush_data(mqtt,
+               csv_filename: str = "data.csv") -> None:
     """
     Read data from the specified CSV file, print it, and delete the file.
     """
     try:
+        messages = []
+
         with open(csv_filename, "r") as f:
+            print("[FLUSH] Reading data from " + csv_filename)
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                data = line.split(",")
-                print("[FLUSH] Flushing data:")
-                print("Date: {} - {}: Temp: {}°C, Hum: {}%, Vol: {}L".format(data[0],
-                                                                             data[1],
-                                                                             data[2],
-                                                                             data[3],
-                                                                             data[4]))
+                parts = line.split(";")
+                if len(parts) >= 4:                    
+                    messages.append({
+                        "topic": parts[0].encode(),
+                        "payload": parts[1].encode(),
+                        "retain": bool(int(parts[2])),
+                        "qos": int(parts[3])
+                    })
+        
+        if messages:
+            print(f"[FLUSH] Processing {len(messages)} historical messages...")
+            send_data(mqtt=mqtt, messages=messages)
+        
         uos.remove(csv_filename)
-        print("[FLUSH] " + csv_filename + " flushed successfully")                                      # TODO: Implement actual data transmission to server
+        print("[FLUSH] " + csv_filename + " flushed successfully")
+
     except Exception as e:
         if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
             print("[FLUSH] No data to flush (" + csv_filename + " not found)")
         else:
             print("[FLUSH] Error reading " + csv_filename + ":", e)
 
-def save_data(date,
-              time,
-              temp,
-              hum,
-              liters,
+def save_data(messages: list[dict],
               csv_filename: str = "data.csv") -> None:
     """
     Save the provided data to a CSV file. Each entry is saved as a separate line in the file.
     """
     try:
-        line = "{},{},{},{},{}\n".format(date, time, temp, hum, liters)
-
         with open(csv_filename, "a") as f:
-            f.write(line)
-        print("[SAVE] Data saved to " + csv_filename)
+            for msg in messages:
+                topic = msg.get("topic").decode()
+                payload = msg.get("payload").decode()
+                retain = 1 if msg.get("retain", False) else 0
+                qos = msg.get("qos", 0)
+                
+                line = "{};{};{};{}\n".format(topic, payload, retain, qos)
+                f.write(line)
+                print(f"[SAVE] Data saved to {csv_filename}: {line.strip()}")
+        print(f"[SAVE] Buffered {len(messages)} messages to {csv_filename}")
     except Exception as e:
         print("[SAVE] Error saving data:", e)
 

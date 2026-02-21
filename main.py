@@ -91,15 +91,23 @@ try:
             
         elif state == "FLUSH_DATA":
             print("[STATE] FLUSH_DATA")
-            flush_data()
+            flush_data(mqtt)
 
             state = "SEND_DATA"
         
         elif state == "SAVE_DATA":
             print("[STATE] SAVE_DATA")
-            save_data(current_date, current_time, temp, hum, liters)
 
-            state = "SEND_DATA"                                                             # NOTE: Change to "SLEEP" when testing is complete to avoid sending data when offline
+            data_tank = data_to_json(date=current_date, time=current_time, quantity_l=liters)
+            data_case = data_to_json(date=current_date, time=current_time, temp_c=temp, hum=hum)
+
+            messages_to_buffer = [
+                {"topic": MQTT_TOPIC_TANK, "payload": data_tank, "retain": False, "qos": 1},
+                {"topic": MQTT_TOPIC_CASE, "payload": data_case, "retain": False, "qos": 1}
+            ]
+
+            save_data(messages=messages_to_buffer)
+            state = "SLEEP"
 
         elif state == "SEND_DATA":
             print("[STATE] SEND_DATA")
@@ -114,8 +122,8 @@ try:
                                      hum=hum)
 
             msg_to_send = [
-                {"topic": MQTT_TOPIC_TANK, "payload": bytes(data_tank), "retain": False, "qos": 0},
-                {"topic": MQTT_TOPIC_CASE, "payload": bytes(data_case), "retain": False, "qos": 0}
+                {"topic": MQTT_TOPIC_TANK, "payload": data_tank, "retain": False, "qos": 0},
+                {"topic": MQTT_TOPIC_CASE, "payload": data_case, "retain": False, "qos": 0}
             ]
 
             send_data(mqtt, messages=msg_to_send)
