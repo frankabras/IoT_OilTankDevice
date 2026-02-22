@@ -8,7 +8,7 @@ from sensor_dht22 import SensorDHT22
 from volume_calculator import HexagonalPrismTank
 from wifi_manager import WifiManager
 from mqtt_manager import MqttManager
-from logging import *
+from secrets import *
 
 """ Constant definitions """
 # Tank dimensions in cm
