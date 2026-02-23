@@ -48,7 +48,7 @@ def connection(wifi) -> bool | None:
         print("[CONNECT] Connection error:", e)
 
 def flush_data(mqtt,
-               csv_filename: str = "data.csv") -> None:
+               csv_filename: str = "data.csv") -> bool:
     """
     Read data from the specified CSV file, print it, and delete the file.
     """
@@ -72,19 +72,27 @@ def flush_data(mqtt,
         
         if messages:
             print(f"[FLUSH] Processing {len(messages)} historical messages...")
-            send_data(mqtt=mqtt, messages=messages)
+            success = send_data(mqtt=mqtt, messages=messages)
+
+            if not success:
+                print("[FLUSH] Failed to send buffered data, will retry later")
+                return False
         
         uos.remove(csv_filename)
         print("[FLUSH] " + csv_filename + " flushed successfully")
+        return True
 
     except Exception as e:
         if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
             print("[FLUSH] No data to flush (" + csv_filename + " not found)")
+            return True
         else:
             print("[FLUSH] Error reading " + csv_filename + ":", e)
+            return False
+
 
 def save_data(messages: list[dict],
-              csv_filename: str = "data.csv") -> None:
+              csv_filename: str = "data.csv") -> bool:
     """
     Save the provided data to a CSV file. Each entry is saved as a separate line in the file.
     """
@@ -100,11 +108,13 @@ def save_data(messages: list[dict],
                 f.write(line)
                 print(f"[SAVE] Data saved to {csv_filename}: {line.strip()}")
         print(f"[SAVE] Buffered {len(messages)} messages to {csv_filename}")
+        return True
     except Exception as e:
         print("[SAVE] Error saving data:", e)
+        return False
 
 def send_data(mqtt,
-              messages: list[dict]) -> None:
+              messages: list[dict]) -> bool:
     """
     Send current measurement data to server via MQTT.
     
@@ -123,8 +133,11 @@ def send_data(mqtt,
                 print(f"[SEND] {topic.decode()}: {payload.decode()} published successfully")
             else:
                 print("[SEND] Invalid message format, missing topic or payload:", msg)
+                return False
+        return True
     except Exception as e:
         print("[SEND] Error sending data:", e)
+        return False
 
 def go_sleep(wifi) -> None:
     """ Enter low power sleep mode (not implemented) """

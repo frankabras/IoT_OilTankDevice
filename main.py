@@ -91,22 +91,34 @@ try:
             
         elif state == "FLUSH_DATA":
             print("[STATE] FLUSH_DATA")
-            flush_data(mqtt)
+            success = flush_data(mqtt)
 
-            state = "SEND_DATA"
+            if success:
+                state = "SEND_DATA"
+            else:
+                print("[ERROR] Failed to flush data, will retry later")
+                state = "SAVE_DATA"
         
         elif state == "SAVE_DATA":
             print("[STATE] SAVE_DATA")
 
-            data_tank = data_to_json(date=current_date, time=current_time, quantity_l=liters)
-            data_case = data_to_json(date=current_date, time=current_time, temp_c=temp, hum=hum)
+            data_tank = data_to_json(date=current_date,
+                                     time=current_time,
+                                     quantity_l=liters)
+            
+            data_case = data_to_json(date=current_date,
+                                     time=current_time,
+                                     temp_c=temp, hum=hum)
 
             messages_to_buffer = [
                 {"topic": MQTT_TOPIC_TANK, "payload": data_tank, "retain": False, "qos": 1},
                 {"topic": MQTT_TOPIC_CASE, "payload": data_case, "retain": False, "qos": 1}
             ]
 
-            save_data(messages=messages_to_buffer)
+            success = save_data(messages=messages_to_buffer)
+            if not success:
+                print("[ERROR] Failed to save data")
+
             state = "SLEEP"
 
         elif state == "SEND_DATA":
@@ -126,9 +138,12 @@ try:
                 {"topic": MQTT_TOPIC_CASE, "payload": data_case, "retain": False, "qos": 0}
             ]
 
-            send_data(mqtt, messages=msg_to_send)
-
-            state = "SLEEP"
+            success = send_data(mqtt, messages=msg_to_send)
+            if success:
+                state = "SLEEP"
+            else:
+                print("[ERROR] Failed to send data")
+                state = "SAVE_DATA"
 
         elif state == "SLEEP":
             print("[STATE] SLEEP")
