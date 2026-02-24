@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
     offset = 20.0 # sensor blind zone in cm
 
-    LevelSensor = PulseSR04(trig_pin=3, echo_pin=4, sensor_offset=offset)
+    LevelSensor = SerialSR04(tx_pin=20, rx_pin=21, sensor_offset=offset)
     tank = HexagonalPrismTank(250, 45.5, 59.5, 53, 74)
 
     # Perform the measurement and record the fuel oil level

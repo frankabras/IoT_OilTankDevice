@@ -3,7 +3,7 @@ Docstring for main
 """
 from utils import *
 # Import sensor and wifi classes
-from sensor_sr04 import PulseSR04
+from sensor_sr04 import SerialSR04
 from sensor_dht22 import SensorDHT22
 from volume_calculator import HexagonalPrismTank
 from wifi_manager import WifiManager
@@ -32,8 +32,8 @@ MQTT_TOPIC_CASE = b"home/ext/oil_tank/measure/in_case"
 # Temperature and humidity sensor (DHT22)
 DHT22_PIN = 2
 # Ultrasonic level sensor (SR04)
-TRIGGER_PIN = 3
-ECHO_PIN = 4
+TX_PIN = 20
+RX_PIN = 21
 # LED indicator for WiFi status
 LED_PIN = 8
 
@@ -44,8 +44,8 @@ print("Initializing components...")
 temp_sensor = SensorDHT22(pin=DHT22_PIN, 
                            internal_pullup=False)
 
-level_sensor = PulseSR04(trig_pin=TRIGGER_PIN, 
-                          echo_pin=ECHO_PIN, 
+level_sensor = SerialSR04(tx_pin=TX_PIN, 
+                          rx_pin=RX_PIN, 
                           sensor_offset=SENSOR_OFFSET)
 
 tank = HexagonalPrismTank(tank_length=TANK_LENGTH, 
