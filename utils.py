@@ -52,43 +52,72 @@ def flush_data(mqtt,
     """
     Read data from the specified CSV file, print it, and delete the file.
     """
-    try:
-        messages = []
+    # Spooling to separate data in process from data no processed yet in case of errors during processing
+    temp_filename = csv_filename + ".tmp"
 
-        with open(csv_filename, "r") as f:
-            print("[FLUSH] Reading data from " + csv_filename)
+    # Check if the file exists before trying to read it
+    try:
+        uos.stat(csv_filename)  # Check if file exists
+    except OSError:
+        print("[FLUSH] No buffered data to flush")
+        return True  # No file to flush, consider it successful
+    
+    # Safely rename the file to avoid conflicts
+    try:
+        uos.rename(csv_filename, temp_filename)
+        print(f"[FLUSH] Renamed {csv_filename} to {temp_filename} for processing")
+    except OSError:
+        return False
+
+    flush_success = True
+
+    try:
+        with open(temp_filename, "r") as f:
+            print("[FLUSH] Reading data from " + temp_filename)
             for line in f:
+                # If an error already occurred during flushing, save remaining lines back to original
+                if not flush_success:
+                    with open(csv_filename, "a") as original_f:
+                        original_f.write(line)
+                        continue
+
                 line = line.strip()
                 if not line:
                     continue
+
                 parts = line.split(";")
                 if len(parts) >= 4:                    
-                    messages.append({
+                    messages = {
                         "topic": parts[0].encode(),
                         "payload": parts[1].encode(),
                         "retain": bool(int(parts[2])),
                         "qos": int(parts[3])
-                    })
+                    }
         
-        if messages:
-            print(f"[FLUSH] Processing {len(messages)} historical messages...")
-            success = send_data(mqtt=mqtt, messages=messages)
-
-            if not success:
-                print("[FLUSH] Failed to send buffered data, will retry later")
-                return False
-        
-        uos.remove(csv_filename)
-        print("[FLUSH] " + csv_filename + " flushed successfully")
-        return True
-
+                    if send_data(mqtt=mqtt, messages=[messages]):
+                        sleep_ms(50)
+                    else:          
+                        print("[FLUSH] Failed to send buffered data, will retry later")
+                        flush_success = False
+                        # Save the current line to original file
+                        with open(csv_filename, "a") as original_f:
+                            original_f.write(line + "\n")
+                else:
+                    print("[FLUSH] Invalid line format, skipping:", line)
     except Exception as e:
-        if isinstance(e, OSError) and e.args[0] == uerrno.ENOENT:
-            print("[FLUSH] No data to flush (" + csv_filename + " not found)")
-            return True
-        else:
-            print("[FLUSH] Error reading " + csv_filename + ":", e)
-            return False
+        print("[FLUSH] Error :", e)
+        flush_success = False
+        
+    try:
+        uos.remove(temp_filename)
+        print("[FLUSH] " + temp_filename + " flushed successfully")
+    except OSError:
+        print("[FLUSH] Error deleting " + temp_filename + ", will retry later")
+
+    if flush_success:
+        print("[FLUSH] All buffered data flushed successfully")
+    
+    return flush_success
 
 
 def save_data(messages: list[dict],
