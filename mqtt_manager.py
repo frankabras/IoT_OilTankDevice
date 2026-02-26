@@ -8,11 +8,15 @@ class MqttManager:
                  client_id: bytes,
                  broker_host: str,
                  broker_port: int,
+                 user: str,
+                 password: str,
                  keepalive: int = 60) -> None:
         # Generate a unique client ID by appending the device's unique ID to the provided client_id prefix
         self._client_id = client_id + ubinascii.hexlify(unique_id())
         self._broker_host = broker_host
         self._broker_port = broker_port
+        self._user = user
+        self._password = password
         self._keepalive = keepalive
         self._client = None
         
@@ -24,6 +28,8 @@ class MqttManager:
             self._client = MQTTClient(self._client_id,
                                       self._broker_host,
                                       self._broker_port,
+                                      user=self._user,
+                                      password=self._password,
                                       keepalive=self._keepalive)
             try:
                 self._client.connect()
@@ -63,13 +69,15 @@ class MqttManager:
 
 if __name__ == "__main__":
     from wifi_manager import WifiManager
-    from logging import *
+    from secrets import home, mqtt_auth
 
-    config = hotspot
+    config = home
     wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO", verbose=True)
     mqtt = MqttManager(client_id=b"test_client_", 
                        broker_host="192.168.0.223", 
                        broker_port=1883, 
+                       user=mqtt_auth["user"],
+                       password=mqtt_auth["password"],
                        keepalive=60)
     
     wifi.start()

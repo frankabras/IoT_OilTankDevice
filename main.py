@@ -8,7 +8,7 @@ from sensor_dht22 import SensorDHT22
 from volume_calculator import HexagonalPrismTank
 from wifi_manager import WifiManager
 from mqtt_manager import MqttManager
-from secrets import *
+from secrets import home, mqtt_auth
 
 """ Constant definitions """
 # Tank dimensions in cm
@@ -60,8 +60,10 @@ wifi = WifiManager(ssid=WIFI_SSID,
                     led_polarity=LED_POLARITY)
 
 mqtt = MqttManager(client_id=b"oil_tank_device_",
-                    broker_host="192.168.0.223", 
-                    broker_port=1883, 
+                    broker_host="192.168.0.223",
+                    broker_port=1883,
+                    user=mqtt_auth["user"],
+                    password=mqtt_auth["password"], 
                     keepalive=60)
 print("Initialization complete. Entering main loop...")
 
