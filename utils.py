@@ -121,35 +121,58 @@ def flush_data(mqtt,
 
 
 def save_data(messages: list[dict],
-              csv_filename: str = "data.csv") -> bool:
+              csv_filename: str = "data.csv",
+              max_retries: int = 3,
+              retry_delay_ms: int = 100,
+              max_size_bytes: int = 51200) -> bool:
     """
     Save the provided data to a CSV file. Each entry is saved as a separate line in the file.
     """
     try:
-        with open(csv_filename, "a") as f:
-            for msg in messages:
-                topic = msg.get("topic").decode()
-                payload = msg.get("payload").decode()
-                retain = 1 if msg.get("retain", False) else 0
-                qos = msg.get("qos", 0)
-                
-                line = "{};{};{};{}\n".format(topic, payload, retain, qos)
-                f.write(line)
-                print(f"[SAVE] Data saved to {csv_filename}: {line.strip()}")
-        print(f"[SAVE] Buffered {len(messages)} messages to {csv_filename}")
-        return True
-    except Exception as e:
-        print("[SAVE] Error saving data:", e)
-        return False
+        # uos.stat returns a tuple with file info, index 6 is the file size in bytes
+        file_size = uos.stat(csv_filename)[6] if uos.stat(csv_filename) else 0
+        if file_size >= max_size_bytes:
+            print(f"[SAVE] Warning: {csv_filename} reached max size ({file_size} bytes)... stopping save.")
+            return False
+    except OSError:
+        pass  # File does not exist yet, will be created
+
+    for attempt in range(max_retries):
+        try:
+            with open(csv_filename, "a") as f:
+                for msg in messages:
+                    topic = msg.get("topic").decode()
+                    payload = msg.get("payload").decode()
+                    retain = 1 if msg.get("retain", False) else 0
+                    qos = msg.get("qos", 0)
+                    
+                    line = f"{topic};{payload};{retain};{qos}\n"
+                    f.write(line)
+                    print(f"[SAVE] Data saved to {csv_filename}: {line.strip()}")
+            print(f"[SAVE] Buffered {len(messages)} messages to {csv_filename}")
+            return True
+        except OSError as e:
+            print("[SAVE] Attempt failed with OSError while saving data:", e)
+            if attempt < max_retries - 1:
+                sleep_ms(retry_delay_ms)
+        except Exception as e:
+            print("[SAVE] Error saving data:", e)
+            return False
+    
+    print("[SAVE] Failed to save data after retries")
+    return False
 
 def send_data(mqtt,
-              messages: list[dict]) -> bool:
+              messages: list[dict],
+              max_retries: int = 3,
+              retry_delay_ms: int = 500) -> bool:
     """
     Send current measurement data to server via MQTT.
     
     :param mqtt: Initializes and connected MQTTManager instance.
     :param messages: List of dictionaries containing 'topic', 'payload', and optional 'retain' and 'qos'.
     """
+
     try:
         for msg in messages:
             topic = msg.get("topic")
@@ -158,7 +181,21 @@ def send_data(mqtt,
             qos = msg.get("qos", 0)
 
             if topic is not None and payload is not None:
-                mqtt.publish(topic=topic, message=payload, retain=retain, qos=qos)
+                message_sent = False
+
+                for attempt in range(max_retries):
+                    try:
+                        mqtt.publish(topic=topic, message=payload, retain=retain, qos=qos)
+                        message_sent = True
+                        break
+                    except OSError as e:
+                        print(f"[SEND] Attempt failed with OSError while sending {topic.decode()}: {e}")
+                        if attempt < max_retries - 1:
+                            sleep_ms(retry_delay_ms)
+
+                if not message_sent:
+                    return False
+                
                 print(f"[SEND] {topic.decode()}: {payload.decode()} published successfully")
             else:
                 print("[SEND] Invalid message format, missing topic or payload:", msg)
@@ -239,9 +276,9 @@ def localtime_brussels() -> tuple[str, str]:
 
     return date_str, time_str
 
-def update_rtc(retry_count: int = 3) -> None:
+def update_rtc(max_retries: int = 3) -> None:
     """ Update RTC time from NTP server """
-    for _ in range(retry_count):
+    for _ in range(max_retries):
         try:
             ntptime.settime()
             print("[RTC] Synchronized with NTP server")
