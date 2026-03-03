@@ -10,7 +10,9 @@ class MqttManager:
                  broker_port: int,
                  user: str,
                  password: str,
-                 keepalive: int = 60) -> None:
+                 keepalive: int = 60,
+                 use_ssl: bool = False,
+                 ssl_params: dict = None) -> None:
         # Generate a unique client ID by appending the device's unique ID to the provided client_id prefix
         self._client_id = client_id + ubinascii.hexlify(unique_id())
         self._broker_host = broker_host
@@ -18,6 +20,8 @@ class MqttManager:
         self._user = user
         self._password = password
         self._keepalive = keepalive
+        self._use_ssl = use_ssl
+        self._ssl_params = ssl_params
         self._client = None
         
     
@@ -30,7 +34,9 @@ class MqttManager:
                                       self._broker_port,
                                       user=self._user,
                                       password=self._password,
-                                      keepalive=self._keepalive)
+                                      keepalive=self._keepalive,
+                                      ssl=self._use_ssl,
+                                      ssl_params=self._ssl_params)
             try:
                 self._client.connect()
                 print("[MQTT] Connected to broker.")
@@ -68,6 +74,7 @@ class MqttManager:
             return False
 
 if __name__ == "__main__":
+    import ssl
     from wifi_manager import WifiManager
     from secrets import home, mqtt_auth
 
@@ -75,10 +82,12 @@ if __name__ == "__main__":
     wifi = WifiManager(config["ssid"], config["pswd"], led_pin=8, led_polarity="LO", verbose=True)
     mqtt = MqttManager(client_id=b"test_client_", 
                        broker_host="192.168.0.223", 
-                       broker_port=1883, 
+                       broker_port=8883, 
                        user=mqtt_auth["user"],
                        password=mqtt_auth["password"],
-                       keepalive=60)
+                       keepalive=60,
+                       use_ssl=True,
+                       ssl_params={"cert_reqs": ssl.CERT_NONE})
     
     wifi.start()
     wifi.enable_connection = True

@@ -1,6 +1,9 @@
 """
 Docstring for main
 """
+# General imports
+import ssl
+# Import utility functions
 from utils import *
 # Import sensor and wifi classes
 from sensor_sr04 import SerialSR04
@@ -64,7 +67,9 @@ mqtt = MqttManager(client_id=b"oil_tank_device_",
                     broker_port=1883,
                     user=mqtt_auth["user"],
                     password=mqtt_auth["password"], 
-                    keepalive=60)
+                    keepalive=60,
+                    use_ssl=True,
+                    ssl_params={"cert_reqs": ssl.CERT_NONE})
 print("Initialization complete. Entering main loop...")
 
 wifi.start()
